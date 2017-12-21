@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/codegangsta/cli"
-	"github.com/ricbra/rabbitmq-cli-consumer/command"
-	"github.com/ricbra/rabbitmq-cli-consumer/config"
-	"github.com/ricbra/rabbitmq-cli-consumer/consumer"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 )
 
 func main() {

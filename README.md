@@ -5,11 +5,21 @@ If you are a fellow PHP developer just like me you're probably aware of the foll
 PHP really SUCKS in long running tasks.
 
 When using RabbitMQ with pure PHP consumers you have to deal with stability issues. Probably you are killing your
-consumers regularly just like me. And try to solve the problem with supervisord. Which also means on every deploy you
+consumers regularly. And try to solve the problem with supervisord. Which also means on every deploy you
 have to restart your consumers. A little bit dramatic if you ask me.
 
-This library aims at PHP developers solving the above described problem with RabbitMQ. Why don't let the polling over to
-a language as Go which is much better suited to run long running tasks.
+This is a fork of the work done by Richard van den Brand and provides a command that aims to solve the above described
+problem for RabbitMQ workers by delegate the long running part to a tool written in go which is much better suited for
+this task. The PHP application then is only executed when there is an AMQP message to process.
+
+This fork came to be, when Richard van den Brand did no longer had the time to maintain his version. Simplification is
+one of the main goal of this fork and no effort will be made to keep the changes backwards compatible.
+
+- Environment dependent settings should be configurable by environment variables.
+- All logs, including the output of the called scripts, will be written to STDOUT/STDERR.
+- The AMQP message will be passed via STDIN (not as argument limitation in size)
+
+WARNING: This is work in progress and not yet intended to be used in production.
 
 # Installation
 
