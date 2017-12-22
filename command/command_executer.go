@@ -21,7 +21,9 @@ func New(errLogger, infLogger *log.Logger) *CommandExecuter {
 func (me CommandExecuter) Execute(cmd *exec.Cmd, output bool) int {
 	me.infLogger.Println("Processing message...")
 
-	var err interface{Error() string} = nil
+	var err interface {
+		Error() string
+	} = nil
 	if output {
 		cmd.Stdout = NewLogWriter(me.infLogger)
 		cmd.Stderr = NewLogWriter(me.errLogger)
@@ -37,7 +39,7 @@ func (me CommandExecuter) Execute(cmd *exec.Cmd, output bool) int {
 
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				return status.ExitStatus();
+				return status.ExitStatus()
 			}
 		}
 
@@ -59,9 +61,9 @@ func NewLogWriter(l *log.Logger) *LogWriter {
 	return lw
 }
 
-func (lw LogWriter) Write (p []byte) (n int, err error) {
+func (lw LogWriter) Write(p []byte) (n int, err error) {
 	lw.logger.SetFlags(0)
 	lw.logger.Printf("%s", p)
-	lw.logger.SetFlags(log.Ldate|log.Ltime)
+	lw.logger.SetFlags(log.Ldate | log.Ltime)
 	return len(p), nil
 }
