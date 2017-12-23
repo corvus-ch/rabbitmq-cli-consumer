@@ -62,8 +62,9 @@ func NewLogWriter(l *log.Logger) *LogWriter {
 }
 
 func (lw LogWriter) Write(p []byte) (n int, err error) {
+	flags := lw.logger.Flags()
 	lw.logger.SetFlags(0)
 	lw.logger.Printf("%s", p)
-	lw.logger.SetFlags(log.Ldate | log.Ltime)
+	lw.logger.SetFlags(flags)
 	return len(p), nil
 }

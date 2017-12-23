@@ -47,6 +47,10 @@ func main() {
 			Name:  "queue-name, q",
 			Usage: "Optional queue name to which can be passed in, without needing to define it in config, if set will override config queue name",
 		},
+		cli.BoolFlag{
+			Name:  "no-datetime",
+			Usage: "prevents the output of date and time in the logs.",
+		},
 	}
 	app.Action = func(c *cli.Context) {
 		if c.String("configuration") == "" && c.String("executable") == "" {
@@ -63,12 +67,12 @@ func main() {
 			logger.Fatalf("Failed parsing configuration: %s\n", err)
 		}
 
-		errLogger, err := createLogger(cfg.Logs.Error, verbose, os.Stderr)
+		errLogger, err := createLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
 		if err != nil {
 			logger.Fatalf("Failed creating error log: %s", err)
 		}
 
-		infLogger, err := createLogger(cfg.Logs.Info, verbose, os.Stdout)
+		infLogger, err := createLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
 		if err != nil {
 			logger.Fatalf("Failed creating info log: %s", err)
 		}
@@ -92,7 +96,7 @@ func main() {
 	app.Run(os.Args)
 }
 
-func createLogger(filename string, verbose bool, out io.Writer) (*log.Logger, error) {
+func createLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
 	file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 
 	if err != nil {
@@ -107,5 +111,10 @@ func createLogger(filename string, verbose bool, out io.Writer) (*log.Logger, er
 		writers = append(writers, out)
 	}
 
-	return log.New(io.MultiWriter(writers...), "", log.Ldate|log.Ltime), nil
+	flags := log.Ldate | log.Ltime
+	if noDateTime {
+		flags = 0
+	}
+
+	return log.New(io.MultiWriter(writers...), "", flags), nil
 }

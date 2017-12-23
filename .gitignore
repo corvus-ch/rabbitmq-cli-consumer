@@ -1,0 +1,15 @@
+### Go
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Binary generated during integration tests
+/rabbitmq-cli-consumer
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
