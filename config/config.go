@@ -57,3 +57,12 @@ func LoadAndParse(location string) (*Config, error) {
 
 	return &cfg, nil
 }
+
+func CreateFromString(data string) (*Config, error) {
+	cfg := &Config{}
+	if err := gcfg.ReadStringInto(cfg, data); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}

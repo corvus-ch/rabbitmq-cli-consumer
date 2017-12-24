@@ -15,6 +15,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/streadway/amqp"
+	"io"
 )
 
 const (
@@ -205,45 +206,81 @@ func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
 	return nil
 }
 
-func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogger *log.Logger) (*Consumer, error) {
-	uri := fmt.Sprintf(
-		"amqp://%s:%s@%s:%s%s",
-		url.QueryEscape(cfg.RabbitMq.Username),
-		url.QueryEscape(cfg.RabbitMq.Password),
-		cfg.RabbitMq.Host,
-		cfg.RabbitMq.Port,
-		cfg.RabbitMq.Vhost,
-	)
+// AmqpURI parses the URI based on config
+func AmqpURI(cfg *config.Config) string {
+	host := cfg.RabbitMq.Host
+	if len(cfg.RabbitMq.Port) > 0 {
+		host = fmt.Sprintf("%s:%s", host, cfg.RabbitMq.Port)
+	}
 
+	uri := url.URL{
+		Scheme: "amqp",
+		Host:   host,
+		Path:   cfg.RabbitMq.Vhost,
+	}
+
+	if len(cfg.RabbitMq.Username) > 0 {
+		if len(cfg.RabbitMq.Password) > 0 {
+			uri.User = url.UserPassword(cfg.RabbitMq.Username, cfg.RabbitMq.Password)
+		} else {
+			uri.User = url.User(cfg.RabbitMq.Username)
+		}
+	}
+
+	return uri.String()
+}
+
+// New returns a initialized consumer based on config
+func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogger *log.Logger) (*Consumer, error) {
 	infLogger.Println("Connecting RabbitMQ...")
-	conn, err := amqp.Dial(uri)
+	conn, err := amqp.Dial(AmqpURI(cfg))
 	if nil != err {
-		return nil, errors.New(fmt.Sprintf("Failed connecting RabbitMQ: %s", err.Error()))
+		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
 	}
 	infLogger.Println("Connected.")
 
 	infLogger.Println("Opening channel...")
 	ch, err := conn.Channel()
 	if nil != err {
-		return nil, errors.New(fmt.Sprintf("Failed to open a channel: %s", err.Error()))
+		return nil, fmt.Errorf("failed to open a channel: %v", err)
 	}
 	infLogger.Println("Done.")
 
+	if err := Initialize(cfg, ch, errLogger, infLogger); err != nil {
+		return nil, err
+	}
+
+	return &Consumer{
+		Channel:     ch,
+		Connection:  conn,
+		Queue:       cfg.RabbitMq.Queue,
+		Factory:     factory,
+		ErrLogger:   errLogger,
+		InfLogger:   infLogger,
+		Executer:    command.New(errLogger, infLogger),
+		Compression: cfg.RabbitMq.Compression,
+	}, nil
+}
+
+// Initialize channel according to config
+func Initialize(cfg *config.Config, ch Channel, errLogger, infLogger *log.Logger) error {
 	infLogger.Println("Setting QoS... ")
+
 	// Attempt to preserve BC here
 	if cfg.Prefetch.Count == 0 {
 		cfg.Prefetch.Count = 3
 	}
+
 	if err := ch.Qos(cfg.Prefetch.Count, 0, cfg.Prefetch.Global); err != nil {
-		return nil, errors.New(fmt.Sprintf("Failed to set QoS: %s", err.Error()))
+		return fmt.Errorf("failed to set QoS: %v", err)
 	}
+
 	infLogger.Println("Succeeded setting QoS.")
 
 	infLogger.Printf("Declaring queue \"%s\"...", cfg.RabbitMq.Queue)
-	_, err = ch.QueueDeclare(cfg.RabbitMq.Queue, true, false, false, false, sanitizeQueueArgs(cfg))
-
+	_, err := ch.QueueDeclare(cfg.RabbitMq.Queue, true, false, false, false, sanitizeQueueArgs(cfg))
 	if nil != err {
-		return nil, errors.New(fmt.Sprintf("Failed to declare queue: %s", err.Error()))
+		return fmt.Errorf("failed to declare queue: %v", err)
 	}
 
 	// Check for missing exchange settings to preserve BC
@@ -257,7 +294,7 @@ func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogg
 		err = ch.ExchangeDeclare(cfg.Exchange.Name, cfg.Exchange.Type, cfg.Exchange.Durable, cfg.Exchange.Autodelete, false, false, amqp.Table{})
 
 		if nil != err {
-			return nil, errors.New(fmt.Sprintf("Failed to declare exchange: %s", err.Error()))
+			return fmt.Errorf("failed to declare exchange: %v", err)
 		}
 
 		// Bind queue
@@ -265,21 +302,11 @@ func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogg
 		err = ch.QueueBind(cfg.RabbitMq.Queue, transformToStringValue(cfg.QueueSettings.Routingkey), transformToStringValue(cfg.Exchange.Name), false, nil)
 
 		if nil != err {
-			return nil, errors.New(fmt.Sprintf("Failed to bind queue to exchange: %s", err.Error()))
+			return fmt.Errorf("failed to bind queue to exchange: %v", err)
 		}
 	}
 
-	return &Consumer{
-		Channel:     ch,
-		Connection:  conn,
-		Queue:       cfg.RabbitMq.Queue,
-		Factory:     factory,
-		ErrLogger:   errLogger,
-		InfLogger:   infLogger,
-		Executer:    command.New(errLogger, infLogger),
-		Compression: cfg.RabbitMq.Compression,
-		OnFailure:   cfg.RabbitMq.Onfailure,
-	}, nil
+	return nil
 }
 
 func sanitizeQueueArgs(cfg *config.Config) amqp.Table {
@@ -311,4 +338,14 @@ func transformToStringValue(val string) string {
 	}
 
 	return val
+}
+
+type Channel interface {
+	io.Closer
+	ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error
+	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
+	Qos(prefetchCount, prefetchSize int, global bool) error
+	QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error
+	Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error)
+	Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
 }
