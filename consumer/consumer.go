@@ -30,10 +30,9 @@ type Consumer struct {
 	Channel         *amqp.Channel
 	Connection      *amqp.Connection
 	Queue           string
-	Factory         *command.CommandFactory
+	Builder         command.Builder
 	ErrLogger       *log.Logger
 	InfLogger       *log.Logger
-	Executer        *command.CommandExecuter
 	Compression     bool
 	IncludeMetadata bool
 	StrictExitCode  bool
@@ -134,27 +133,24 @@ func (c *Consumer) Consume(output bool) {
 				}
 			}
 
+			r, err := payloadReader(input, c.Compression)
+			if err != nil {
+				c.ErrLogger.Println(err)
+				d.Nack(true, true)
+			}
 			if c.Compression {
-				var b bytes.Buffer
-				w, err := zlib.NewWriterLevel(&b, zlib.BestCompression)
-				if err != nil {
-					c.ErrLogger.Println("Could not create zlib handler")
-					d.Nack(true, true)
-				}
 				c.InfLogger.Println("Compressed message")
-				w.Write(input)
-				w.Close()
-
-				input = b.Bytes()
 			}
 
-			cmd := c.Factory.Create(base64.StdEncoding.EncodeToString(input))
-
-			exitCode := c.Executer.Execute(cmd, output)
-
-			err := c.ack(d, exitCode)
-
+			cmd, err := c.Builder.GetCommand(r, output)
 			if err != nil {
+				c.ErrLogger.Printf("failed to create command: %v", err)
+				d.Nack(true, true)
+			}
+
+			exitCode := cmd.Run()
+
+			if err := c.ack(d, exitCode); err != nil {
 				c.ErrLogger.Fatalf("Message acknowledgement error: %v", err)
 				os.Exit(11)
 			}
@@ -163,6 +159,29 @@ func (c *Consumer) Consume(output bool) {
 
 	c.InfLogger.Println("Waiting for messages...")
 	<-forever
+}
+
+func payloadReader(b []byte, compressed bool) (io.Reader, error) {
+	var w io.Writer
+	buf := &bytes.Buffer{}
+
+	enc := base64.NewEncoder(base64.StdEncoding, buf)
+	defer enc.Close()
+	w = enc
+
+	if compressed {
+		comp, err := zlib.NewWriterLevel(enc, zlib.BestCompression)
+		defer comp.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create zlib handler: %v", err)
+		}
+		w = comp
+	}
+	if _, err := w.Write(b); err != nil {
+		return nil, fmt.Errorf("failed to write payload: %v", err)
+	}
+
+	return buf, nil
 }
 
 func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
@@ -206,7 +225,7 @@ func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
 }
 
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogger *log.Logger) (*Consumer, error) {
+func New(cfg *config.Config, builder command.Builder, errLogger, infLogger *log.Logger) (*Consumer, error) {
 	infLogger.Println("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -229,10 +248,9 @@ func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogg
 		Channel:     ch,
 		Connection:  conn,
 		Queue:       cfg.RabbitMq.Queue,
-		Factory:     factory,
+		Builder:     builder,
 		ErrLogger:   errLogger,
 		InfLogger:   infLogger,
-		Executer:    command.New(errLogger, infLogger),
 		Compression: cfg.RabbitMq.Compression,
 	}, nil
 }

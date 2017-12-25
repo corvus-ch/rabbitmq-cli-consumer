@@ -91,9 +91,12 @@ func main() {
 			cfg.RabbitMq.Queue = c.String("queue-name")
 		}
 
-		factory := command.Factory(c.String("executable"))
+		builder, err := command.NewBuilder(&command.ArgumentBuilder{}, c.String("executable"), infLogger, errLogger)
+		if err != nil {
+			logger.Fatalf("failed to create command builder: %v", err)
+		}
 
-		client, err := consumer.New(cfg, factory, errLogger, infLogger)
+		client, err := consumer.New(cfg, builder, errLogger, infLogger)
 		if err != nil {
 			errLogger.Fatalf("Failed creating consumer: %s", err)
 		}
