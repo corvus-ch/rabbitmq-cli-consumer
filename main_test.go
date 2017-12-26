@@ -109,7 +109,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	stopCmd := exec.Command("docker-compose", "stop")
+	stopCmd := exec.Command("docker-compose", "down", "--volumes", "--remove-orphans")
 	if err := stopCmd.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to stop docker stack: %v\n", err)
 		os.Exit(1)

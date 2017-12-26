@@ -1,35 +1,45 @@
-PACKAGES := ./...
-DEPENDENCIES := ./...
-TEST_ARGS ?=
+MAKEFLAGS += --warn-undefined-variables
+SHELL := bash
+.SHELLFLAGS := -eu -o pipefail -c
+.DEFAULT_GOAL := test
+.DELETE_ON_ERROR:
+.SUFFIXES:
 
-all: build test-silent
+# ---------------------
+# Environment variables
+# ---------------------
 
-build: rabbitmq-cli-consumer
+GOPATH := $(shell go env GOPATH)
 
-rabbitmq-cli-consumer: **/*.go *.go
-	go build
+# ------------------
+# Internal variables
+# ------------------
+
+package_name   := rabbitmq-cli-consumer
+test_args      := -v
+
+# -------
+# Targets
+# -------
+
+.PHONY: install
+install:
+	go get -t -d -tags=integration ./...
+
+build: ${package_name}
 
 .PHONY: test
 test:
-	go test -v $(PACKAGES)
-
-.PHONY: test-silent
-test-silent:
-	go test $(PACKAGES)
+	go test ${test_args} ./...
 
 .PHONY: test-integration
 test-integration:
-	go test -tags=integration -v $(TEST_ARGS) $(PACKAGES)
+	go test -tags=integration $(test_args) ./...
 
-.PHONY: format
-format:
-	go fmt $(PACKAGES)
-
-.PHONY: deps
-deps:
-	go get $(DEPENDENCIES)
+${package_name}: **/*.go *.go
+	go build
 
 .PHONY: clean
 clean:
-	rm rabbitmq-cli-consumer
-
+	rm -rf ${package_name}
+	rm *.log
