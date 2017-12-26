@@ -396,6 +396,40 @@ class TestCommand extends ContainerAwareCommand
 }
 ```
 
+## Use pipes instead of arguments
+
+When starting the consymer with the `-pipes` option, the AMQP message will be
+passed on to the executable using STDIN for the message body and fd3 for the
+metadata containing the properties and the delivery info encoded as JSON.
+
+```php
+#!/usr/bin/env php
+<?php
+
+// Read the metadata from fd3.
+$metadata = file_get_contents("php://fd/3");
+if (false === $metadata) {
+  fwrite(STDERR, "failed to read metadata from fd3\n");
+  exit(1);
+}
+
+// Decode the metadata.
+$metadata = json_decode($metadata, true);
+if (JSON_ERROR_NONE != json_last_error()) {
+  fwrite(STDERR, "failed to decode metadata\n");
+  fwrite(STDERR, json_last_error_msg() . PHP_EOL);
+  exit(1);
+}
+
+// Read the body from STDIN.
+$body = file_get_contents("php://stdin");
+if (false === $body) {
+  fwrite(STDERR, "failed to read body from STDIN\n");
+  exit(1);
+}
+
+```
+
 # Strict exit code processing
 
 By default, any non-zero exit code will make consumer send a negative acknowledgement and re-queue message back to the queue, in some cases it may cause your consumer to fall into an infinite loop as re-queued message will be getting back to consumer and it probably will fail again.

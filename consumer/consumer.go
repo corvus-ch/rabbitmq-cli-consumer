@@ -1,20 +1,16 @@
 package consumer
 
 import (
-	"bytes"
-	"compress/zlib"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"time"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/streadway/amqp"
-	"io"
 )
 
 const (
@@ -30,39 +26,13 @@ type Consumer struct {
 	Channel         *amqp.Channel
 	Connection      *amqp.Connection
 	Queue           string
-	Factory         *command.CommandFactory
+	Builder         command.Builder
 	ErrLogger       *log.Logger
 	InfLogger       *log.Logger
-	Executer        *command.CommandExecuter
 	Compression     bool
 	IncludeMetadata bool
 	StrictExitCode  bool
 	OnFailure       int
-}
-
-type Properties struct {
-	Headers         amqp.Table `json:"application_headers"`
-	ContentType     string     `json:"content_type"`
-	ContentEncoding string     `json:"content_encoding"`
-	DeliveryMode    uint8      `json:"delivery_mode"`
-	Priority        uint8      `json:"priority"`
-	CorrelationId   string     `json:"correlation_id"`
-	ReplyTo         string     `json:"reply_to"`
-	Expiration      string     `json:"expiration"`
-	MessageId       string     `json:"message_id"`
-	Timestamp       time.Time  `json:"timestamp"`
-	Type            string     `json:"type"`
-	UserId          string     `json:"user_id"`
-	AppId           string     `json:"app_id"`
-}
-
-type DeliveryInfo struct {
-	MessageCount uint32 `json:"message_count"`
-	ConsumerTag  string `json:"consumer_tag"`
-	DeliveryTag  uint64 `json:"delivery_tag"`
-	Redelivered  bool   `json:"redelivered"`
-	Exchange     string `json:"exchange"`
-	RoutingKey   string `json:"routing_key"`
 }
 
 func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
@@ -92,69 +62,40 @@ func (c *Consumer) Consume(output bool) {
 
 	go func() {
 		for d := range msgs {
-			input := d.Body
-
-			if c.IncludeMetadata {
-				input, err = json.Marshal(&struct {
-					Properties   `json:"properties"`
-					DeliveryInfo `json:"delivery_info"`
-					Body         string `json:"body"`
-				}{
-
-					Properties: Properties{
-						Headers:         d.Headers,
-						ContentType:     d.ContentType,
-						ContentEncoding: d.ContentEncoding,
-						DeliveryMode:    d.DeliveryMode,
-						Priority:        d.Priority,
-						CorrelationId:   d.CorrelationId,
-						ReplyTo:         d.ReplyTo,
-						Expiration:      d.Expiration,
-						MessageId:       d.MessageId,
-						Timestamp:       d.Timestamp,
-						Type:            d.Type,
-						AppId:           d.AppId,
-						UserId:          d.UserId,
-					},
-
-					DeliveryInfo: DeliveryInfo{
-						ConsumerTag:  d.ConsumerTag,
-						MessageCount: d.MessageCount,
-						DeliveryTag:  d.DeliveryTag,
-						Redelivered:  d.Redelivered,
-						Exchange:     d.Exchange,
-						RoutingKey:   d.RoutingKey,
-					},
-
-					Body: string(d.Body),
-				})
-				if err != nil {
-					c.ErrLogger.Fatalf("Failed to marshall: %s", err)
-					d.Nack(true, true)
-				}
+			props := metadata.Properties{
+				Headers:         d.Headers,
+				ContentType:     d.ContentType,
+				ContentEncoding: d.ContentEncoding,
+				DeliveryMode:    d.DeliveryMode,
+				Priority:        d.Priority,
+				CorrelationId:   d.CorrelationId,
+				ReplyTo:         d.ReplyTo,
+				Expiration:      d.Expiration,
+				MessageId:       d.MessageId,
+				Timestamp:       d.Timestamp,
+				Type:            d.Type,
+				AppId:           d.AppId,
+				UserId:          d.UserId,
 			}
 
-			if c.Compression {
-				var b bytes.Buffer
-				w, err := zlib.NewWriterLevel(&b, zlib.BestCompression)
-				if err != nil {
-					c.ErrLogger.Println("Could not create zlib handler")
-					d.Nack(true, true)
-				}
-				c.InfLogger.Println("Compressed message")
-				w.Write(input)
-				w.Close()
-
-				input = b.Bytes()
+			delivery := metadata.DeliveryInfo{
+				ConsumerTag:  d.ConsumerTag,
+				MessageCount: d.MessageCount,
+				DeliveryTag:  d.DeliveryTag,
+				Redelivered:  d.Redelivered,
+				Exchange:     d.Exchange,
+				RoutingKey:   d.RoutingKey,
 			}
 
-			cmd := c.Factory.Create(base64.StdEncoding.EncodeToString(input))
-
-			exitCode := c.Executer.Execute(cmd, output)
-
-			err := c.ack(d, exitCode)
-
+			cmd, err := c.Builder.GetCommand(props, delivery, d.Body, output)
 			if err != nil {
+				c.ErrLogger.Printf("failed to create command: %v", err)
+				d.Nack(true, true)
+			}
+
+			exitCode := cmd.Run()
+
+			if err := c.ack(d, exitCode); err != nil {
 				c.ErrLogger.Fatalf("Message acknowledgement error: %v", err)
 				os.Exit(11)
 			}
@@ -206,7 +147,7 @@ func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
 }
 
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogger *log.Logger) (*Consumer, error) {
+func New(cfg *config.Config, builder command.Builder, errLogger, infLogger *log.Logger) (*Consumer, error) {
 	infLogger.Println("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -229,10 +170,9 @@ func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogg
 		Channel:     ch,
 		Connection:  conn,
 		Queue:       cfg.RabbitMq.Queue,
-		Factory:     factory,
+		Builder:     builder,
 		ErrLogger:   errLogger,
 		InfLogger:   infLogger,
-		Executer:    command.New(errLogger, infLogger),
 		Compression: cfg.RabbitMq.Compression,
 	}, nil
 }

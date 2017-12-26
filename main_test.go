@@ -93,6 +93,13 @@ var tests = []struct {
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("envAmqpUrl")},
 		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
 	},
+	{
+		"pipe",
+		[]string{"-V", "-no-datetime", "-pipe", "-e", "go run test/command.go -pipe", "-c", "test/default.conf"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("pipe")},
+		[]string{},
+	},
 }
 
 func TestMain(m *testing.M) {
