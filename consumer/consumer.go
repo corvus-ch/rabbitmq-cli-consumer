@@ -1,20 +1,16 @@
 package consumer
 
 import (
-	"bytes"
-	"compress/zlib"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"time"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/streadway/amqp"
-	"io"
 )
 
 const (
@@ -37,31 +33,6 @@ type Consumer struct {
 	IncludeMetadata bool
 	StrictExitCode  bool
 	OnFailure       int
-}
-
-type Properties struct {
-	Headers         amqp.Table `json:"application_headers"`
-	ContentType     string     `json:"content_type"`
-	ContentEncoding string     `json:"content_encoding"`
-	DeliveryMode    uint8      `json:"delivery_mode"`
-	Priority        uint8      `json:"priority"`
-	CorrelationId   string     `json:"correlation_id"`
-	ReplyTo         string     `json:"reply_to"`
-	Expiration      string     `json:"expiration"`
-	MessageId       string     `json:"message_id"`
-	Timestamp       time.Time  `json:"timestamp"`
-	Type            string     `json:"type"`
-	UserId          string     `json:"user_id"`
-	AppId           string     `json:"app_id"`
-}
-
-type DeliveryInfo struct {
-	MessageCount uint32 `json:"message_count"`
-	ConsumerTag  string `json:"consumer_tag"`
-	DeliveryTag  uint64 `json:"delivery_tag"`
-	Redelivered  bool   `json:"redelivered"`
-	Exchange     string `json:"exchange"`
-	RoutingKey   string `json:"routing_key"`
 }
 
 func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
@@ -91,58 +62,32 @@ func (c *Consumer) Consume(output bool) {
 
 	go func() {
 		for d := range msgs {
-			input := d.Body
-
-			if c.IncludeMetadata {
-				input, err = json.Marshal(&struct {
-					Properties   `json:"properties"`
-					DeliveryInfo `json:"delivery_info"`
-					Body         string `json:"body"`
-				}{
-
-					Properties: Properties{
-						Headers:         d.Headers,
-						ContentType:     d.ContentType,
-						ContentEncoding: d.ContentEncoding,
-						DeliveryMode:    d.DeliveryMode,
-						Priority:        d.Priority,
-						CorrelationId:   d.CorrelationId,
-						ReplyTo:         d.ReplyTo,
-						Expiration:      d.Expiration,
-						MessageId:       d.MessageId,
-						Timestamp:       d.Timestamp,
-						Type:            d.Type,
-						AppId:           d.AppId,
-						UserId:          d.UserId,
-					},
-
-					DeliveryInfo: DeliveryInfo{
-						ConsumerTag:  d.ConsumerTag,
-						MessageCount: d.MessageCount,
-						DeliveryTag:  d.DeliveryTag,
-						Redelivered:  d.Redelivered,
-						Exchange:     d.Exchange,
-						RoutingKey:   d.RoutingKey,
-					},
-
-					Body: string(d.Body),
-				})
-				if err != nil {
-					c.ErrLogger.Fatalf("Failed to marshall: %s", err)
-					d.Nack(true, true)
-				}
+			props := metadata.Properties{
+				Headers:         d.Headers,
+				ContentType:     d.ContentType,
+				ContentEncoding: d.ContentEncoding,
+				DeliveryMode:    d.DeliveryMode,
+				Priority:        d.Priority,
+				CorrelationId:   d.CorrelationId,
+				ReplyTo:         d.ReplyTo,
+				Expiration:      d.Expiration,
+				MessageId:       d.MessageId,
+				Timestamp:       d.Timestamp,
+				Type:            d.Type,
+				AppId:           d.AppId,
+				UserId:          d.UserId,
 			}
 
-			r, err := payloadReader(input, c.Compression)
-			if err != nil {
-				c.ErrLogger.Println(err)
-				d.Nack(true, true)
-			}
-			if c.Compression {
-				c.InfLogger.Println("Compressed message")
+			delivery := metadata.DeliveryInfo{
+				ConsumerTag:  d.ConsumerTag,
+				MessageCount: d.MessageCount,
+				DeliveryTag:  d.DeliveryTag,
+				Redelivered:  d.Redelivered,
+				Exchange:     d.Exchange,
+				RoutingKey:   d.RoutingKey,
 			}
 
-			cmd, err := c.Builder.GetCommand(r, output)
+			cmd, err := c.Builder.GetCommand(props, delivery, d.Body, output)
 			if err != nil {
 				c.ErrLogger.Printf("failed to create command: %v", err)
 				d.Nack(true, true)
@@ -159,29 +104,6 @@ func (c *Consumer) Consume(output bool) {
 
 	c.InfLogger.Println("Waiting for messages...")
 	<-forever
-}
-
-func payloadReader(b []byte, compressed bool) (io.Reader, error) {
-	var w io.Writer
-	buf := &bytes.Buffer{}
-
-	enc := base64.NewEncoder(base64.StdEncoding, buf)
-	defer enc.Close()
-	w = enc
-
-	if compressed {
-		comp, err := zlib.NewWriterLevel(enc, zlib.BestCompression)
-		defer comp.Close()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create zlib handler: %v", err)
-		}
-		w = comp
-	}
-	if _, err := w.Write(b); err != nil {
-		return nil, fmt.Errorf("failed to write payload: %v", err)
-	}
-
-	return buf, nil
 }
 
 func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {

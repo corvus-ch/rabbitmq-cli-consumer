@@ -1,10 +1,16 @@
 package command
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 )
 
 type PipeBuilder struct {
@@ -44,19 +50,41 @@ func (b *PipeBuilder) SetCommand(cmd string) {
 	b.args = args
 }
 
-func (b *PipeBuilder) GetCommand(payload io.Reader, capture bool) (*Command, error) {
+func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte, capture bool) (*Command, error) {
+
+	meta, err := json.Marshal(&struct {
+		Properties   metadata.Properties   `json:"properties"`
+		DeliveryInfo metadata.DeliveryInfo `json:"delivery_info"`
+	}{
+
+		Properties:   p,
+		DeliveryInfo: d,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshall matadata: %v", err)
+	}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pipe: %v", err)
+	}
+
 	c := &Command{
 		outLogger: b.outLogger,
 		errLogger: b.errLogger,
 		cmd:       exec.Command(b.cmd, b.args...),
 	}
 
-	c.cmd.Stdin = payload
+	c.cmd.Stdin = bytes.NewBuffer(body)
+	c.cmd.ExtraFiles = []*os.File{r}
 
 	if capture {
 		c.cmd.Stdout = b.outputWriter
 		c.cmd.Stderr = b.errorWriter
 	}
+
+	w.Write(meta)
+	w.Close()
 
 	return c, nil
 }

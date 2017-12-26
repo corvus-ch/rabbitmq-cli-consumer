@@ -3,6 +3,8 @@ package command
 import (
 	"io"
 	"log"
+
+	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 )
 
 type Builder interface {
@@ -11,7 +13,7 @@ type Builder interface {
 	SetOutputWriter(w io.Writer)
 	SetErrorWriter(lw io.Writer)
 	SetCommand(cmd string)
-	GetCommand(payload io.Reader, capture bool) (*Command, error)
+	GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte, capture bool) (*Command, error)
 }
 
 func NewBuilder(b Builder, cmd string, outLogger, errLogger *log.Logger) (Builder, error) {

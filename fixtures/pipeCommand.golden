@@ -1,3 +1,3 @@
 Got executed
-cGlwZQ==
+{"properties":{"application_headers":null,"content_type":"text/plain","content_encoding":"","delivery_mode":0,"priority":0,"correlation_id":"","reply_to":"","expiration":"","message_id":"","timestamp":"0001-01-01T00:00:00Z","type":"","user_id":"","app_id":""},"delivery_info":{"message_count":0,"consumer_tag":"ctag-./rabbitmq-cli-consumer-1","delivery_tag":1,"redelivered":false,"exchange":"","routing_key":"test"}}
 pipe

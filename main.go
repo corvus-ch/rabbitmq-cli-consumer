@@ -42,11 +42,11 @@ func main() {
 		},
 		cli.BoolFlag{
 			Name:  "pipe, p",
-			Usage: "Pipe the message via STDIN instead of passing it as an argument.",
+			Usage: "Pipe the message via STDIN instead of passing it as an argument. The message metadata will be passed as JSON via fd3.",
 		},
 		cli.BoolFlag{
 			Name:  "include, i",
-			Usage: "Include metadata. Passes message as JSON data including headers, properties and message body.",
+			Usage: "Include metadata. Passes message as JSON data including headers, properties and message body. This flag will be ignored when `-pipe` is used.",
 		},
 		cli.BoolFlag{
 			Name:  "strict-exit-code",
@@ -95,7 +95,7 @@ func main() {
 			cfg.RabbitMq.Queue = c.String("queue-name")
 		}
 
-		builder, err := command.NewBuilder(createBuilder(c.Bool("pipe")), c.String("executable"), infLogger, errLogger)
+		builder, err := command.NewBuilder(createBuilder(c, cfg), c.String("executable"), infLogger, errLogger)
 		if err != nil {
 			logger.Fatalf("failed to create command builder: %v", err)
 		}
@@ -104,7 +104,6 @@ func main() {
 		if err != nil {
 			errLogger.Fatalf("Failed creating consumer: %s", err)
 		}
-		client.IncludeMetadata = c.Bool("include")
 		client.StrictExitCode = c.Bool("strict-exit-code")
 
 		client.Consume(c.Bool("output"))
@@ -113,12 +112,15 @@ func main() {
 	app.Run(os.Args)
 }
 
-func createBuilder(pipe bool) command.Builder {
-	if pipe {
+func createBuilder(c *cli.Context, cfg *config.Config) command.Builder {
+	if c.Bool("pipe") {
 		return &command.PipeBuilder{}
 	}
 
-	return &command.ArgumentBuilder{}
+	return &command.ArgumentBuilder{
+		Compressed:   cfg.RabbitMq.Compression,
+		WithMetadata: c.Bool("include"),
+	}
 }
 
 func createLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {

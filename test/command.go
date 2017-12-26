@@ -3,14 +3,14 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"bytes"
 	"compress/zlib"
-	"io/ioutil"
 	"encoding/base64"
 	"flag"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 )
 
 // Command to be executed by the consumer during integration tests.
@@ -37,9 +37,21 @@ func main() {
 	var message []byte
 	if *isPipe {
 		var err error
+
+		pipe := os.NewFile(3, "/proc/self/fd/3")
+		defer pipe.Close()
+		metadata, err := ioutil.ReadAll(pipe)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to read metadata from pipe: %v", err)
+			os.Exit(1)
+		}
+
+		f.Write(metadata)
+		f.Write([]byte("\n"))
+
 		message, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read from pipe: %v", err)
+			fmt.Fprintf(os.Stderr, "failed to read body from pipe: %v", err)
 			os.Exit(1)
 		}
 	} else {
@@ -50,23 +62,24 @@ func main() {
 	f.Write([]byte("\n"))
 
 
-	var r io.Reader
-	r = base64.NewDecoder(base64.StdEncoding, bytes.NewBuffer(message))
+	if !*isPipe {
+		var r io.Reader
+		r = base64.NewDecoder(base64.StdEncoding, bytes.NewBuffer(message))
 	if *isCompressed {
-		zr, err := zlib.NewReader(r)
+				zr, err := zlib.NewReader(r)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to create zlib reader: %v\n", err)
+					os.Exit(1)
+				}
+				defer zr.Close()
+				r = zr
+	}
+		original, err := ioutil.ReadAll(r)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create zlib reader: %v\n", err)
+			fmt.Fprintf(os.Stderr, "failed to decompress input: %v\n", err)
 			os.Exit(1)
 		}
-		defer zr.Close()
-		r = zr
+		f.Write(original)
+		f.Write([]byte("\n"))
 	}
-	original, err := ioutil.ReadAll(r)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to decompress input: %v\n", err)
-		os.Exit(1)
-	}
-
-	f.Write(original)
-	f.Write([]byte("\n"))
 }
