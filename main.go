@@ -20,6 +20,11 @@ func main() {
 	app.Version = "1.4.2"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
+			Name:   "url, u",
+			Usage:  "Connect with RabbitMQ using `URL`",
+			EnvVar: "AMQP_URL",
+		},
+		cli.StringFlag{
 			Name:  "executable, e",
 			Usage: "Location of executable",
 		},
@@ -65,6 +70,11 @@ func main() {
 
 		if err != nil {
 			logger.Fatalf("Failed parsing configuration: %s\n", err)
+		}
+
+		url := c.String("url")
+		if len(url) > 0 {
+			cfg.RabbitMq.AmqpUrl = url
 		}
 
 		errLogger, err := createLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))

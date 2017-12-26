@@ -1,10 +1,9 @@
-package consumer_test
+package config_test
 
 import (
 	"testing"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/magiconair/properties/assert"
 )
 
@@ -70,6 +69,21 @@ port = 1234
 vhost = myhost`,
 		"amqp://richard:my%40%3Asecr%25t@example.com:1234/myhost",
 	},
+	{
+		`[rabbitmq]
+amqpurl = amqp://guest:guest@example.com/myhost`,
+		"amqp://guest:guest@example.com/myhost",
+	},
+	{
+		`[rabbitmq]
+username = richard
+password = my@:secr%t
+host = example.com
+port = 1234
+vhost = myhost
+amqpurl = amqp://guest:guest@example.com/myhost`,
+		"amqp://guest:guest@example.com/myhost",
+	},
 }
 
 func TestParseAndEscapeUri(t *testing.T) {
@@ -78,6 +92,6 @@ func TestParseAndEscapeUri(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to load config: %v", err)
 		}
-		assert.Equal(t, data.uri, consumer.AmqpURI(cfg))
+		assert.Equal(t, cfg.AmqpUrl(), data.uri)
 	}
 }

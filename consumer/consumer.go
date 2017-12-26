@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"time"
 
@@ -206,34 +205,10 @@ func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
 	return nil
 }
 
-// AmqpURI parses the URI based on config
-func AmqpURI(cfg *config.Config) string {
-	host := cfg.RabbitMq.Host
-	if len(cfg.RabbitMq.Port) > 0 {
-		host = fmt.Sprintf("%s:%s", host, cfg.RabbitMq.Port)
-	}
-
-	uri := url.URL{
-		Scheme: "amqp",
-		Host:   host,
-		Path:   cfg.RabbitMq.Vhost,
-	}
-
-	if len(cfg.RabbitMq.Username) > 0 {
-		if len(cfg.RabbitMq.Password) > 0 {
-			uri.User = url.UserPassword(cfg.RabbitMq.Username, cfg.RabbitMq.Password)
-		} else {
-			uri.User = url.User(cfg.RabbitMq.Username)
-		}
-	}
-
-	return uri.String()
-}
-
 // New returns a initialized consumer based on config
 func New(cfg *config.Config, factory *command.CommandFactory, errLogger, infLogger *log.Logger) (*Consumer, error) {
 	infLogger.Println("Connecting RabbitMQ...")
-	conn, err := amqp.Dial(AmqpURI(cfg))
+	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
 		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
 	}

@@ -23,36 +23,43 @@ var tests = []struct {
 	queue string
 	// The AMQ message sent.
 	msg amqp.Publishing
+	// The commands environment
+	env []string
 }{
 	{
 		"default",
 		[]string{"-V", "-no-datetime", "-e", "go run test/command.go", "-c", "test/default.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("default")},
+		[]string{},
 	},
 	{
 		"compressed",
 		[]string{"-V", "-no-datetime", "-e", "go run test/command.go -comp", "-c", "test/compressed.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("compressed")},
+		[]string{},
 	},
 	{
 		"output",
 		[]string{"-V", "-no-datetime", "-o", "-e", "go run test/command.go -output=-", "-c", "test/default.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("output")},
+		[]string{},
 	},
 	{
 		"queueName",
 		[]string{"-V", "-no-datetime", "-q", "altTest", "-e", "go run test/command.go", "-c", "test/default.conf"},
 		"altTest",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("queueName")},
+		[]string{},
 	},
 	{
 		"mute",
 		[]string{"-o", "-e", "go run test/command.go -output=-", "-c", "test/default.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("mute")},
+		[]string{},
 	},
 	{
 		"properties",
@@ -63,6 +70,28 @@ var tests = []struct {
 			CorrelationId: "679eaffe-e290-4565-a223-8b1ec10f6b26",
 			Body:          []byte("properties"),
 		},
+		[]string{},
+	},
+	{
+		"amqpUrl",
+		[]string{"-V", "-no-datetime", "-e", "go run test/command.go", "-c", "test/amqp_url.conf"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("amqpUrl")},
+		[]string{},
+	},
+	{
+		"noAmqpUrl",
+		[]string{"-V", "-no-datetime", "-e", "go run test/command.go", "-c", "test/no_amqp_url.conf"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("noAmqpUrl")},
+		[]string{},
+	},
+	{
+		"envAmqpUrl",
+		[]string{"-V", "-no-datetime", "-e", "go run test/command.go", "-c", "test/no_amqp_url.conf"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("envAmqpUrl")},
+		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
 	},
 }
 
@@ -113,6 +142,7 @@ func TestEndToEnd(t *testing.T) {
 		cmd := exec.Command("./rabbitmq-cli-consumer", test.args...)
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
+		cmd.Env = append(os.Environ(), test.env...)
 
 		if err := cmd.Start(); err != nil {
 			t.Errorf("failed to start consumer: %v", err)
