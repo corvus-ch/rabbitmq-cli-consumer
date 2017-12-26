@@ -19,6 +19,7 @@ import (
 func main() {
 	outputFile := flag.String("output", "./command.log", "the output file")
 	isCompressed := flag.Bool("comp", false, "whether the argument is compressed or not")
+	isPipe := flag.Bool("pipe", false, "whether the argument passed via stdin (TRUE) or argument (FALSE)")
 	flag.Parse()
 	var f io.Writer
 	f = os.Stdout
@@ -33,7 +34,17 @@ func main() {
 	}
 	f.Write([]byte("Got executed\n"))
 
-	message := []byte(os.Args[len(os.Args)-1])
+	var message []byte
+	if *isPipe {
+		var err error
+		message, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to read from pipe: %v", err)
+			os.Exit(1)
+		}
+	} else {
+		message = []byte(os.Args[len(os.Args)-1])
+	}
 
 	f.Write(message)
 	f.Write([]byte("\n"))

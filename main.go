@@ -41,6 +41,10 @@ func main() {
 			Usage: "Enable verbose mode (logs to stdout and stderr)",
 		},
 		cli.BoolFlag{
+			Name:  "pipe, p",
+			Usage: "Pipe the message via STDIN instead of passing it as an argument.",
+		},
+		cli.BoolFlag{
 			Name:  "include, i",
 			Usage: "Include metadata. Passes message as JSON data including headers, properties and message body.",
 		},
@@ -91,7 +95,7 @@ func main() {
 			cfg.RabbitMq.Queue = c.String("queue-name")
 		}
 
-		builder, err := command.NewBuilder(&command.ArgumentBuilder{}, c.String("executable"), infLogger, errLogger)
+		builder, err := command.NewBuilder(createBuilder(c.Bool("pipe")), c.String("executable"), infLogger, errLogger)
 		if err != nil {
 			logger.Fatalf("failed to create command builder: %v", err)
 		}
@@ -107,6 +111,14 @@ func main() {
 	}
 
 	app.Run(os.Args)
+}
+
+func createBuilder(pipe bool) command.Builder {
+	if pipe {
+		return &command.PipeBuilder{}
+	}
+
+	return &command.ArgumentBuilder{}
 }
 
 func createLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
