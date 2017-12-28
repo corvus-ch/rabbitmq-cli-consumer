@@ -55,7 +55,7 @@ func (b *PipeBuilder) SetCaptureOutput(capture bool) {
 	b.capture = capture
 }
 
-func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (*Command, error) {
+func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error) {
 
 	meta, err := json.Marshal(&struct {
 		Properties   metadata.Properties   `json:"properties"`
@@ -74,7 +74,7 @@ func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo,
 		return nil, fmt.Errorf("failed to create pipe: %v", err)
 	}
 
-	c := &Command{
+	c := &ExecCommand{
 		outLogger: b.outLogger,
 		errLogger: b.errLogger,
 		cmd:       exec.Command(b.cmd, b.args...),

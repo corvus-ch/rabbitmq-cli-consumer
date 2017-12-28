@@ -6,13 +6,17 @@ import (
 	"syscall"
 )
 
-type Command struct {
+type Command interface {
+	Run() int
+}
+
+type ExecCommand struct {
 	cmd       *exec.Cmd
 	outLogger *log.Logger
 	errLogger *log.Logger
 }
 
-func (c Command) Run() int {
+func (c ExecCommand) Run() int {
 	var err error
 
 	c.outLogger.Println("Processing message...")

@@ -14,7 +14,7 @@ type Builder interface {
 	SetErrorWriter(lw io.Writer)
 	SetCaptureOutput(captrue bool)
 	SetCommand(cmd string)
-	GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (*Command, error)
+	GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error)
 }
 
 func NewBuilder(b Builder, cmd string, capture bool, outLogger, errLogger *log.Logger) (Builder, error) {

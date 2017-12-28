@@ -63,7 +63,7 @@ func (c *Consumer) Consume() {
 
 	go func() {
 		for d := range msgs {
-			c.ProcessMessage(d)
+			c.ProcessMessage(NewRabbitMqDelivery(d), metadata.NewProperties(d), metadata.NewDeliveryInfo(d))
 		}
 	}()
 
@@ -71,25 +71,23 @@ func (c *Consumer) Consume() {
 	<-forever
 }
 
-func (c *Consumer) ProcessMessage(d amqp.Delivery) {
-	props := metadata.NewProperties(d)
-	delivery := metadata.NewDeliveryInfo(d)
-
-	cmd, err := c.Builder.GetCommand(props, delivery, d.Body)
+func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.DeliveryInfo) {
+	cmd, err := c.Builder.GetCommand(p, m, d.Body())
 	if err != nil {
 		c.ErrLogger.Printf("failed to create command: %v", err)
 		d.Nack(true, true)
+		return
 	}
 
 	exitCode := cmd.Run()
 
 	if err := c.ack(d, exitCode); err != nil {
-		c.ErrLogger.Fatalf("Message acknowledgement error: %v", err)
+		c.ErrLogger.Printf("Message acknowledgement error: %v", err)
 		os.Exit(11)
 	}
 }
 
-func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
+func (c *Consumer) ack(d Delivery, exitCode int) error {
 	if c.StrictExitCode == false {
 		if exitCode == EXIT_ACK {
 			d.Ack(true)
@@ -157,6 +155,7 @@ func New(cfg *config.Config, builder command.Builder, errLogger, infLogger *log.
 		ErrLogger:   errLogger,
 		InfLogger:   infLogger,
 		Compression: cfg.RabbitMq.Compression,
+		OnFailure:   cfg.RabbitMq.Onfailure,
 	}, nil
 }
 
