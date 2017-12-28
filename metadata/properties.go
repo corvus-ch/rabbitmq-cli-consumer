@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
+	"github.com/docker/docker/distribution/metadata"
 )
 
 type Properties struct {
@@ -20,4 +21,22 @@ type Properties struct {
 	Type            string     `json:"type"`
 	UserId          string     `json:"user_id"`
 	AppId           string     `json:"app_id"`
+}
+
+func NewProperties(d amqp.Delivery) Properties {
+	return Properties{
+		Headers:         d.Headers,
+		ContentType:     d.ContentType,
+		ContentEncoding: d.ContentEncoding,
+		DeliveryMode:    d.DeliveryMode,
+		Priority:        d.Priority,
+		CorrelationId:   d.CorrelationId,
+		ReplyTo:         d.ReplyTo,
+		Expiration:      d.Expiration,
+		MessageId:       d.MessageId,
+		Timestamp:       d.Timestamp,
+		Type:            d.Type,
+		AppId:           d.AppId,
+		UserId:          d.UserId,
+	}
 }

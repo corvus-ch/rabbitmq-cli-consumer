@@ -62,48 +62,30 @@ func (c *Consumer) Consume(output bool) {
 
 	go func() {
 		for d := range msgs {
-			props := metadata.Properties{
-				Headers:         d.Headers,
-				ContentType:     d.ContentType,
-				ContentEncoding: d.ContentEncoding,
-				DeliveryMode:    d.DeliveryMode,
-				Priority:        d.Priority,
-				CorrelationId:   d.CorrelationId,
-				ReplyTo:         d.ReplyTo,
-				Expiration:      d.Expiration,
-				MessageId:       d.MessageId,
-				Timestamp:       d.Timestamp,
-				Type:            d.Type,
-				AppId:           d.AppId,
-				UserId:          d.UserId,
-			}
-
-			delivery := metadata.DeliveryInfo{
-				ConsumerTag:  d.ConsumerTag,
-				MessageCount: d.MessageCount,
-				DeliveryTag:  d.DeliveryTag,
-				Redelivered:  d.Redelivered,
-				Exchange:     d.Exchange,
-				RoutingKey:   d.RoutingKey,
-			}
-
-			cmd, err := c.Builder.GetCommand(props, delivery, d.Body, output)
-			if err != nil {
-				c.ErrLogger.Printf("failed to create command: %v", err)
-				d.Nack(true, true)
-			}
-
-			exitCode := cmd.Run()
-
-			if err := c.ack(d, exitCode); err != nil {
-				c.ErrLogger.Fatalf("Message acknowledgement error: %v", err)
-				os.Exit(11)
-			}
+			c.ProcessMessage(d, output)
 		}
 	}()
 
 	c.InfLogger.Println("Waiting for messages...")
 	<-forever
+}
+
+func (c *Consumer) ProcessMessage(d amqp.Delivery, output bool) {
+	props := metadata.NewProperties(d)
+	delivery := metadata.NewDeliveryInfo(d)
+
+	cmd, err := c.Builder.GetCommand(props, delivery, d.Body, output)
+	if err != nil {
+		c.ErrLogger.Printf("failed to create command: %v", err)
+		d.Nack(true, true)
+	}
+
+	exitCode := cmd.Run()
+
+	if err := c.ack(d, exitCode); err != nil {
+		c.ErrLogger.Fatalf("Message acknowledgement error: %v", err)
+		os.Exit(11)
+	}
 }
 
 func (c *Consumer) ack(d amqp.Delivery, exitCode int) error {
