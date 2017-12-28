@@ -21,6 +21,7 @@ type PipeBuilder struct {
 	errorWriter  io.Writer
 	cmd          string
 	args         []string
+	capture      bool
 }
 
 func (b *PipeBuilder) SetOutputLogger(l *log.Logger) {
@@ -50,7 +51,11 @@ func (b *PipeBuilder) SetCommand(cmd string) {
 	b.args = args
 }
 
-func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte, capture bool) (*Command, error) {
+func (b *PipeBuilder) SetCaptureOutput(capture bool) {
+	b.capture = capture
+}
+
+func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (*Command, error) {
 
 	meta, err := json.Marshal(&struct {
 		Properties   metadata.Properties   `json:"properties"`
@@ -78,7 +83,7 @@ func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo,
 	c.cmd.Stdin = bytes.NewBuffer(body)
 	c.cmd.ExtraFiles = []*os.File{r}
 
-	if capture {
+	if b.capture {
 		c.cmd.Stdout = b.outputWriter
 		c.cmd.Stderr = b.errorWriter
 	}

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
-	"github.com/docker/docker/distribution/metadata"
 )
 
 type Properties struct {

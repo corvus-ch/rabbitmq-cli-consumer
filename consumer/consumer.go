@@ -33,6 +33,7 @@ type Consumer struct {
 	IncludeMetadata bool
 	StrictExitCode  bool
 	OnFailure       int
+	CaptureOutput   bool
 }
 
 func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
@@ -41,7 +42,7 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 	os.Exit(10)
 }
 
-func (c *Consumer) Consume(output bool) {
+func (c *Consumer) Consume() {
 	c.InfLogger.Println("Registering consumer... ")
 	msgs, err := c.Channel.Consume(c.Queue, "", false, false, false, false, nil)
 	if err != nil {
@@ -62,7 +63,7 @@ func (c *Consumer) Consume(output bool) {
 
 	go func() {
 		for d := range msgs {
-			c.ProcessMessage(d, output)
+			c.ProcessMessage(d)
 		}
 	}()
 
@@ -70,11 +71,11 @@ func (c *Consumer) Consume(output bool) {
 	<-forever
 }
 
-func (c *Consumer) ProcessMessage(d amqp.Delivery, output bool) {
+func (c *Consumer) ProcessMessage(d amqp.Delivery) {
 	props := metadata.NewProperties(d)
 	delivery := metadata.NewDeliveryInfo(d)
 
-	cmd, err := c.Builder.GetCommand(props, delivery, d.Body, output)
+	cmd, err := c.Builder.GetCommand(props, delivery, d.Body)
 	if err != nil {
 		c.ErrLogger.Printf("failed to create command: %v", err)
 		d.Nack(true, true)

@@ -24,6 +24,7 @@ type ArgumentBuilder struct {
 	errorWriter  io.Writer
 	cmd          string
 	args         []string
+	capture       bool
 }
 
 func (b *ArgumentBuilder) SetOutputLogger(l *log.Logger) {
@@ -53,7 +54,11 @@ func (b *ArgumentBuilder) SetCommand(cmd string) {
 	b.args = args
 }
 
-func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte, capture bool) (*Command, error) {
+func (b *ArgumentBuilder) SetCaptureOutput(capture bool) {
+	b.capture = capture
+}
+
+func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (*Command, error) {
 	var err error
 	payload := body
 	if b.WithMetadata {
@@ -83,7 +88,7 @@ func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryI
 		cmd:       exec.Command(b.cmd, append(b.args, buf.String())...),
 	}
 
-	if capture {
+	if b.capture {
 		c.cmd.Stdout = b.outputWriter
 		c.cmd.Stderr = b.errorWriter
 	}

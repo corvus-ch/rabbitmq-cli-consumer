@@ -95,7 +95,7 @@ func main() {
 			cfg.RabbitMq.Queue = c.String("queue-name")
 		}
 
-		builder, err := command.NewBuilder(createBuilder(c, cfg), c.String("executable"), infLogger, errLogger)
+		builder, err := command.NewBuilder(createBuilder(c, cfg), c.String("executable"), c.Bool("output"), infLogger, errLogger)
 		if err != nil {
 			logger.Fatalf("failed to create command builder: %v", err)
 		}
@@ -106,7 +106,7 @@ func main() {
 		}
 		client.StrictExitCode = c.Bool("strict-exit-code")
 
-		client.Consume(c.Bool("output"))
+		client.Consume()
 	}
 
 	app.Run(os.Args)
