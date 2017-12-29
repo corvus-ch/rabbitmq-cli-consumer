@@ -11,5 +11,9 @@
 # Binary generated during integration tests
 /rabbitmq-cli-consumer
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Output of the go coverage tool
+/.coverage/
 *.out
+
+# test helpers
+cc-test-reporter

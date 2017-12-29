@@ -10,6 +10,7 @@ SHELL := bash
 # ---------------------
 
 GOPATH := $(shell go env GOPATH)
+WORK_DIR := ".coverage"
 
 # ------------------
 # Internal variables
@@ -25,21 +26,21 @@ test_args      := -v
 .PHONY: install
 install:
 	go get -t -d -tags=integration ./...
+	go get github.com/axw/gocov/gocov
 
 build: ${package_name}
 
 .PHONY: test
 test:
-	go test ${test_args} ./...
+	WORK_DIR=$(WORK_DIR) ./script/coverage ${test_args}
 
 .PHONY: test-integration
 test-integration:
-	go test -tags=integration $(test_args) ./...
+	WORK_DIR=$(WORK_DIR) ./script/coverage -tags=integration ${test_args}
 
 ${package_name}: **/*.go *.go
 	go build
 
 .PHONY: clean
 clean:
-	rm -rf ${package_name}
-	rm *.log
+	rm -rf ${package_name} *.log *.out $(WORK_DIR)

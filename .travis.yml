@@ -14,11 +14,16 @@ sudo: required
 services:
   - docker
 
+before_script:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+
 install:
   - make install
 
 script:
   - make test-integration
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
+after_script:
+  - ./cc-test-reporter sum-coverage --output - .coverage/*.json | ./cc-test-reporter upload-coverage --input -
