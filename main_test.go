@@ -13,6 +13,7 @@ import (
 
 	"github.com/sebdah/goldie"
 	"github.com/streadway/amqp"
+	"strings"
 )
 
 var tests = []struct {
@@ -52,13 +53,6 @@ var tests = []struct {
 		[]string{"-V", "-no-datetime", "-q", "altTest", "-e", "go run test/command.go", "-c", "test/default.conf"},
 		"altTest",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("queueName")},
-		[]string{},
-	},
-	{
-		"mute",
-		[]string{"-o", "-e", "go run test/command.go -output=-", "-c", "test/default.conf"},
-		"test",
-		amqp.Publishing{ContentType: "text/plain", Body: []byte("mute")},
 		[]string{},
 	},
 	{
@@ -138,60 +132,85 @@ func TestEndToEnd(t *testing.T) {
 	defer ch.Close()
 
 	for _, test := range tests {
-		os.Remove("./command.log")
-		q, err := ch.QueueDeclare(test.queue, true, false, false, false, nil)
-		if err != nil {
-			t.Errorf("failed to declare queue; %v", err)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			os.Remove("./command.log")
+			declareQueue(t, ch, test.queue)
 
-		stdout := &bytes.Buffer{}
-		stderr := &bytes.Buffer{}
-		cmd := exec.Command("./rabbitmq-cli-consumer", test.args...)
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-		cmd.Env = append(os.Environ(), test.env...)
+			cmd, stdout, stderr := newCommand(test.env, test.args...)
+			if err := cmd.Start(); err != nil {
+				t.Errorf("failed to start consumer: %v", err)
+			}
 
-		if err := cmd.Start(); err != nil {
-			t.Errorf("failed to start consumer: %v", err)
-		}
+			err = ch.Publish("", test.queue, false, false, test.msg)
+			if err != nil {
+				t.Errorf("failed to publish message: %v", err)
+			}
 
-		err = ch.Publish("", q.Name, false, false, test.msg)
-		if err != nil {
-			t.Errorf("failed to publish message: %v", err)
-		}
+			if waitMessageProcessed(stdout) {
+				t.Errorf("timeout while waiting for message processing")
+			}
 
-		// Wait for message to be processed.
-		// TODO: reliably detect if message actually was processed.
-		time.Sleep(time.Second)
+			if err := cmd.Process.Kill(); err != nil {
+				t.Errorf("failed to stop consumer: %v", err)
+			}
 
-		if err := cmd.Process.Kill(); err != nil {
-			t.Errorf("failed to stop consumer: %v", err)
-		}
-
-		output, _ := ioutil.ReadFile("./command.log")
-		goldie.Assert(t, test.name+"Command", output)
-		goldie.Assert(t, test.name+"Output", stdout.Bytes())
-		goldie.Assert(t, test.name+"Error", stderr.Bytes())
+			output, _ := ioutil.ReadFile("./command.log")
+			goldie.Assert(t, test.name+"Command", output)
+			goldie.Assert(t, test.name+"Output", stdout.Bytes())
+			goldie.Assert(t, test.name+"Error", stderr.Bytes())
+		})
 	}
 }
 
 func newConnection(url string) (*amqp.Connection, error) {
-	time.Sleep(4 * time.Second)
-	ticker := time.NewTicker(time.Second)
-	quit := make(chan struct{})
+	timeout := time.After(10 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	for {
 		select {
+		case <-timeout:
+			ticker.Stop()
+			return nil, fmt.Errorf("timeout while trying to connect to RabbitMQ")
+
 		case <-ticker.C:
 			conn, err := amqp.Dial(url)
-			if err != nil {
-				fmt.Println("trying to reconnect in one second...")
-			} else {
+			if err == nil {
 				return conn, nil
 			}
-		case <-quit:
-			ticker.Stop()
+		}
+	}
+}
 
-			return nil, fmt.Errorf("timeout while trying to connect to RabbitMQ")
+func declareQueue(t *testing.T, ch *amqp.Channel, name string) amqp.Queue {
+	q, err := ch.QueueDeclare(name, true, false, false, false, nil)
+	if err != nil {
+		t.Errorf("failed to declare queue; %v", err)
+	}
+	return q
+}
+
+func newCommand(env []string, arg ...string) (cmd *exec.Cmd, stdout *bytes.Buffer, stderr *bytes.Buffer) {
+	stdout = &bytes.Buffer{}
+	stderr = &bytes.Buffer{}
+	cmd = exec.Command("./rabbitmq-cli-consumer", arg...)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.Env = append(os.Environ(), env...)
+	return cmd, stdout, stderr
+}
+
+func waitMessageProcessed(buf *bytes.Buffer) bool {
+	timeout := time.After(10 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	for {
+		select {
+		case <-timeout:
+			ticker.Stop()
+			return true
+
+		case <-ticker.C:
+			if strings.Contains(buf.String(), "Processed!") {
+				return false
+			}
 		}
 	}
 }
