@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,26 +12,16 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// Mapping of script exit codes and message acknowledgment.
-const (
-	exitAck           = 0
-	exitReject        = 3
-	exitRejectRequeue = 4
-	exitNack          = 5
-	exitNackRequeue   = 6
-)
-
 type Consumer struct {
 	Channel         *amqp.Channel
 	Connection      *amqp.Connection
 	Queue           string
 	Builder         command.Builder
+	Acknowledger    Acknowledger
 	ErrLogger       *log.Logger
 	InfLogger       *log.Logger
 	Compression     bool
 	IncludeMetadata bool
-	StrictExitCode  bool
-	OnFailure       int
 	CaptureOutput   bool
 }
 
@@ -81,54 +70,14 @@ func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.
 
 	exitCode := cmd.Run()
 
-	if err := c.ack(d, exitCode); err != nil {
+	if err := c.Acknowledger.Ack(d, exitCode); err != nil {
 		c.ErrLogger.Printf("Message acknowledgement error: %v", err)
 		os.Exit(11)
 	}
 }
 
-func (c *Consumer) ack(d Delivery, exitCode int) error {
-	if c.StrictExitCode == false {
-		if exitCode == exitAck {
-			d.Ack(true)
-			return nil
-		}
-		switch c.OnFailure {
-		case exitReject:
-			d.Reject(false)
-		case exitRejectRequeue:
-			d.Reject(true)
-		case exitNack:
-			d.Nack(true, false)
-		case exitNackRequeue:
-			d.Nack(true, true)
-		default:
-			d.Nack(true, true)
-		}
-		return nil
-	}
-
-	switch exitCode {
-	case exitAck:
-		d.Ack(true)
-	case exitReject:
-		d.Reject(false)
-	case exitRejectRequeue:
-		d.Reject(true)
-	case exitNack:
-		d.Nack(true, false)
-	case exitNackRequeue:
-		d.Nack(true, true)
-	default:
-		d.Nack(true, true)
-		return errors.New(fmt.Sprintf("Unexpected exit code %v", exitCode))
-	}
-
-	return nil
-}
-
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, builder command.Builder, errLogger, infLogger *log.Logger) (*Consumer, error) {
+func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogger, infLogger *log.Logger) (*Consumer, error) {
 	infLogger.Println("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -148,14 +97,14 @@ func New(cfg *config.Config, builder command.Builder, errLogger, infLogger *log.
 	}
 
 	return &Consumer{
-		Channel:     ch,
-		Connection:  conn,
-		Queue:       cfg.RabbitMq.Queue,
-		Builder:     builder,
-		ErrLogger:   errLogger,
-		InfLogger:   infLogger,
-		Compression: cfg.RabbitMq.Compression,
-		OnFailure:   cfg.RabbitMq.Onfailure,
+		Channel:      ch,
+		Connection:   conn,
+		Queue:        cfg.RabbitMq.Queue,
+		Builder:      builder,
+		Acknowledger: ack,
+		ErrLogger:    errLogger,
+		InfLogger:    infLogger,
+		Compression:  cfg.RabbitMq.Compression,
 	}, nil
 }
 

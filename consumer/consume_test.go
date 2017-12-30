@@ -1,19 +1,19 @@
 package consumer_test
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"log"
+	"os"
 	"testing"
 
+	"github.com/bouk/monkey"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
-	"github.com/stretchr/testify/mock"
-	"bytes"
-	"github.com/bouk/monkey"
-	"os"
 	"github.com/stretchr/testify/assert"
-	"fmt"
+	"github.com/stretchr/testify/mock"
 )
 
 var processingTests = []struct {
@@ -47,9 +47,8 @@ func TestProcessing(t *testing.T) {
 			cmd := new(TestCommand)
 			body := []byte(test.name)
 			c := consumer.Consumer{
-				Builder:     b,
-				StrictExitCode: test.strict,
-				OnFailure: test.onFailure,
+				Builder:      b,
+				Acknowledger: consumer.NewAcknowledger(test.strict, test.onFailure),
 			}
 
 			b.On("GetCommand", p, di, body).Return(cmd, nil)
@@ -74,8 +73,8 @@ func TestCommandFailure(t *testing.T) {
 	di := metadata.DeliveryInfo{}
 	body := []byte("cmdFailure")
 	c := consumer.Consumer{
-		Builder:     b,
-		ErrLogger:      log.New(buf, "", 0),
+		Builder:   b,
+		ErrLogger: log.New(buf, "", 0),
 	}
 
 	b.On("GetCommand", p, di, body).Return(new(TestCommand), fmt.Errorf("failed from test"))
@@ -103,9 +102,9 @@ func TestStrictDefault(t *testing.T) {
 	cmd := new(TestCommand)
 	body := []byte("strictDefault")
 	c := consumer.Consumer{
-		Builder:        b,
-		StrictExitCode: true,
-		ErrLogger:      log.New(&bytes.Buffer{}, "", 0),
+		Builder:      b,
+		Acknowledger: &consumer.StrictAcknowledger{},
+		ErrLogger:    log.New(&bytes.Buffer{}, "", 0),
 	}
 
 	b.On("GetCommand", p, di, body).Return(cmd, nil)
@@ -126,6 +125,7 @@ type TestBuilder struct {
 	command.Builder
 	mock.Mock
 }
+
 func (b *TestBuilder) SetOutputLogger(l *log.Logger) {
 	b.Called(l)
 }

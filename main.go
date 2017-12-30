@@ -100,11 +100,12 @@ func main() {
 			logger.Fatalf("failed to create command builder: %v", err)
 		}
 
-		client, err := consumer.New(cfg, builder, errLogger, infLogger)
+		ack := consumer.NewAcknowledger(c.Bool("strict-exit-code"), cfg.RabbitMq.Onfailure)
+
+		client, err := consumer.New(cfg, builder, ack, errLogger, infLogger)
 		if err != nil {
 			errLogger.Fatalf("Failed creating consumer: %s", err)
 		}
-		client.StrictExitCode = c.Bool("strict-exit-code")
 
 		client.Consume()
 	}
