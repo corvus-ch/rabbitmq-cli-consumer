@@ -18,6 +18,14 @@ type ExecCommand struct {
 	errLogger *log.Logger
 }
 
+func NewExecCommand(cmd *exec.Cmd, outLog, errLog *log.Logger) Command {
+	return &ExecCommand{
+		cmd:       cmd,
+		outLogger: outLog,
+		errLogger: errLog,
+	}
+}
+
 func (ec ExecCommand) Cmd() *exec.Cmd {
 	return ec.cmd
 }
@@ -26,6 +34,7 @@ func (c ExecCommand) Run() int {
 	var err error
 
 	c.outLogger.Println("Processing message...")
+	defer c.outLogger.Println("Processed!")
 
 	if c.cmd.Stdout == nil && c.cmd.Stderr == nil {
 		var out []byte
@@ -49,8 +58,6 @@ func (c ExecCommand) Run() int {
 
 		return 1
 	}
-
-	c.outLogger.Println("Processed!")
 
 	return 0
 }

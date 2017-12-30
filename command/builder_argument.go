@@ -83,20 +83,15 @@ func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryI
 		return nil, err
 	}
 
-	c := &ExecCommand{
-		outLogger: b.outLogger,
-		errLogger: b.errLogger,
-		cmd:       exec.Command(b.cmd, append(b.args, buf.String())...),
-	}
-
-	c.cmd.Env = os.Environ()
+	cmd := exec.Command(b.cmd, append(b.args, buf.String())...)
+	cmd.Env = os.Environ()
 
 	if b.capture {
-		c.cmd.Stdout = b.outputWriter
-		c.cmd.Stderr = b.errorWriter
+		cmd.Stdout = b.outputWriter
+		cmd.Stderr = b.errorWriter
 	}
 
-	return c, nil
+	return NewExecCommand(cmd, b.outLogger, b.errLogger), nil
 }
 
 func (b *ArgumentBuilder) payloadBuffer(payload []byte) (*bytes.Buffer, error) {

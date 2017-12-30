@@ -74,23 +74,19 @@ func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo,
 		return nil, fmt.Errorf("failed to create pipe: %v", err)
 	}
 
-	c := &ExecCommand{
-		outLogger: b.outLogger,
-		errLogger: b.errLogger,
-		cmd:       exec.Command(b.cmd, b.args...),
-	}
+	cmd := exec.Command(b.cmd, b.args...)
 
-	c.cmd.Env = os.Environ()
-	c.cmd.Stdin = bytes.NewBuffer(body)
-	c.cmd.ExtraFiles = []*os.File{r}
+	cmd.Env = os.Environ()
+	cmd.Stdin = bytes.NewBuffer(body)
+	cmd.ExtraFiles = []*os.File{r}
 
 	if b.capture {
-		c.cmd.Stdout = b.outputWriter
-		c.cmd.Stderr = b.errorWriter
+		cmd.Stdout = b.outputWriter
+		cmd.Stderr = b.errorWriter
 	}
 
 	w.Write(meta)
 	w.Close()
 
-	return c, nil
+	return NewExecCommand(cmd, b.outLogger, b.errLogger), nil
 }
