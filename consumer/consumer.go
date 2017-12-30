@@ -13,13 +13,13 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Mapping of script exit codes and message acknowledgment.
 const (
-	EXIT_ACK            = 0
-	EXIT_REJECT         = 3
-	EXIT_REJECT_REQUEUE = 4
-	EXIT_NACK           = 5
-	EXIT_NACK_REQUEUE   = 6
-	EMPTY_STRING        = "<empty>"
+	exitAck           = 0
+	exitReject        = 3
+	exitRejectRequeue = 4
+	exitNack          = 5
+	exitNackRequeue   = 6
 )
 
 type Consumer struct {
@@ -89,18 +89,18 @@ func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.
 
 func (c *Consumer) ack(d Delivery, exitCode int) error {
 	if c.StrictExitCode == false {
-		if exitCode == EXIT_ACK {
+		if exitCode == exitAck {
 			d.Ack(true)
 			return nil
 		}
 		switch c.OnFailure {
-		case EXIT_REJECT:
+		case exitReject:
 			d.Reject(false)
-		case EXIT_REJECT_REQUEUE:
+		case exitRejectRequeue:
 			d.Reject(true)
-		case EXIT_NACK:
+		case exitNack:
 			d.Nack(true, false)
-		case EXIT_NACK_REQUEUE:
+		case exitNackRequeue:
 			d.Nack(true, true)
 		default:
 			d.Nack(true, true)
@@ -109,15 +109,15 @@ func (c *Consumer) ack(d Delivery, exitCode int) error {
 	}
 
 	switch exitCode {
-	case EXIT_ACK:
+	case exitAck:
 		d.Ack(true)
-	case EXIT_REJECT:
+	case exitReject:
 		d.Reject(false)
-	case EXIT_REJECT_REQUEUE:
+	case exitRejectRequeue:
 		d.Reject(true)
-	case EXIT_NACK:
+	case exitNack:
 		d.Nack(true, false)
-	case EXIT_NACK_REQUEUE:
+	case exitNackRequeue:
 		d.Nack(true, true)
 	default:
 		d.Nack(true, true)
@@ -230,7 +230,7 @@ func sanitizeQueueArgs(cfg *config.Config) amqp.Table {
 }
 
 func transformToStringValue(val string) string {
-	if val == EMPTY_STRING {
+	if val == "<empty>" {
 		return ""
 	}
 
