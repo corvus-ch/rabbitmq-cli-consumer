@@ -7,22 +7,22 @@ import (
 
 type LogWriter struct {
 	io.Writer
-	logger *log.Logger
+	Logger *log.Logger
 }
 
 func NewLogWriter(l *log.Logger) *LogWriter {
 	lw := &LogWriter{}
-	lw.logger = l
+	lw.Logger = l
 
 	return lw
 }
 
 func (lw LogWriter) Write(b []byte) (n int, err error) {
-	flags := lw.logger.Flags()
+	flags := lw.Logger.Flags()
 
-	lw.logger.SetFlags(0)
-	lw.logger.Print(string(b))
-	lw.logger.SetFlags(flags)
+	lw.Logger.SetFlags(0)
+	lw.Logger.Print(string(b))
+	lw.Logger.SetFlags(flags)
 
 	return len(b), nil
 }

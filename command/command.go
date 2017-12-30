@@ -8,12 +8,18 @@ import (
 
 type Command interface {
 	Run() int
+	Cmd() *exec.Cmd
 }
 
 type ExecCommand struct {
+	Command
 	cmd       *exec.Cmd
 	outLogger *log.Logger
 	errLogger *log.Logger
+}
+
+func (ec ExecCommand) Cmd() *exec.Cmd {
+	return ec.cmd
 }
 
 func (c ExecCommand) Run() int {

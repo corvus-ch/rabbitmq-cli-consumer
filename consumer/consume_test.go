@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/bouk/monkey"
@@ -158,4 +159,8 @@ type TestCommand struct {
 
 func (t TestCommand) Run() int {
 	return t.Called().Int(0)
+}
+
+func (t TestCommand) Cmd() *exec.Cmd {
+	return t.Called().Get(0).(*exec.Cmd)
 }

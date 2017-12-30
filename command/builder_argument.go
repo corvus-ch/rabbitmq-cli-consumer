@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -24,7 +25,7 @@ type ArgumentBuilder struct {
 	errorWriter  io.Writer
 	cmd          string
 	args         []string
-	capture       bool
+	capture      bool
 }
 
 func (b *ArgumentBuilder) SetOutputLogger(l *log.Logger) {
@@ -87,6 +88,8 @@ func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryI
 		errLogger: b.errLogger,
 		cmd:       exec.Command(b.cmd, append(b.args, buf.String())...),
 	}
+
+	c.cmd.Env = os.Environ()
 
 	if b.capture {
 		c.cmd.Stdout = b.outputWriter
