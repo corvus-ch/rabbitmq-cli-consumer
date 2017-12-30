@@ -80,6 +80,7 @@ func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo,
 		cmd:       exec.Command(b.cmd, b.args...),
 	}
 
+	c.cmd.Env = os.Environ()
 	c.cmd.Stdin = bytes.NewBuffer(body)
 	c.cmd.ExtraFiles = []*os.File{r}
 

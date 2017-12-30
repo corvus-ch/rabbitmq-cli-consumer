@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var getCommandTests = []struct {
+var argumentBuilderGetCommandTests = []struct {
 	name         string
 	compressed   bool
 	withMetadata bool
@@ -64,7 +64,7 @@ var getCommandTests = []struct {
 }
 
 func TestArgumentBuilder_GetCommand(t *testing.T) {
-	for _, test := range getCommandTests {
+	for _, test := range argumentBuilderGetCommandTests {
 		t.Run(test.name, func(t *testing.T) {
 			outLog := log.New(&bytes.Buffer{}, "", 0)
 			errLog := log.New(&bytes.Buffer{}, "", 0)
