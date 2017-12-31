@@ -4,11 +4,7 @@ package main_test
 
 import (
 	"bytes"
-	"compress/zlib"
-	"encoding/base64"
-	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -102,6 +98,32 @@ var tests = []struct {
 	},
 }
 
+func TestEndToEnd(t *testing.T) {
+	conn := prepare()
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	if err != nil {
+		t.Errorf("failed to open channel: %v", err)
+	}
+	defer ch.Close()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			os.Remove("./command.log")
+			cmd, stdout, stderr := startConsumer(t, test.env, test.args...)
+			declareQueueAndPublish(t, ch, test.queue, test.msg)
+			waitMessageProcessed(t, stdout)
+			stopConsumer(t, cmd)
+
+			output, _ := ioutil.ReadFile("./command.log")
+			goldie.Assert(t, t.Name()+"Command", output)
+			goldie.Assert(t, t.Name()+"Output", stdout.Bytes())
+			goldie.Assert(t, t.Name()+"Error", stderr.Bytes())
+		})
+	}
+}
+
 func prepare() *amqp.Connection {
 	makeCmd := exec.Command("make", "build")
 	if err := makeCmd.Run(); err != nil {
@@ -121,7 +143,7 @@ func prepare() *amqp.Connection {
 		os.Exit(1)
 	}
 
-	conn, err := newConnection("amqp://guest:guest@localhost:5672/")
+	conn, err := connect("amqp://guest:guest@localhost:5672/")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to open AMQP connection: %v", err)
 		os.Exit(1)
@@ -130,130 +152,7 @@ func prepare() *amqp.Connection {
 	return conn
 }
 
-func TestEndToEnd(t *testing.T) {
-	conn := prepare()
-	defer conn.Close()
-
-	ch, err := conn.Channel()
-	if err != nil {
-		t.Errorf("failed to open channel: %v", err)
-	}
-	defer ch.Close()
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			os.Remove("./command.log")
-			declareQueue(t, ch, test.queue)
-
-			cmd, stdout, stderr := newCommand(test.env, test.args...)
-			if err := cmd.Start(); err != nil {
-				t.Errorf("failed to start consumer: %v", err)
-			}
-
-			err = ch.Publish("", test.queue, false, false, test.msg)
-			if err != nil {
-				t.Errorf("failed to publish message: %v", err)
-			}
-
-			if waitMessageProcessed(stdout) {
-				t.Errorf("timeout while waiting for message processing")
-			}
-
-			if err := cmd.Process.Kill(); err != nil {
-				t.Errorf("failed to stop consumer: %v", err)
-			}
-
-			output, _ := ioutil.ReadFile("./command.log")
-			goldie.Assert(t, t.Name()+"Command", output)
-			goldie.Assert(t, t.Name()+"Output", stdout.Bytes())
-			goldie.Assert(t, t.Name()+"Error", stderr.Bytes())
-		})
-	}
-}
-
-func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
-	}
-	defer os.Exit(0)
-
-	args := os.Args
-	for len(args) > 0 {
-		if args[0] == "--" {
-			args = args[1:]
-			break
-		}
-		args = args[1:]
-	}
-	cli := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	outputFile := cli.String("output", "./command.log", "the output file")
-	isCompressed := cli.Bool("comp", false, "whether the argument is compressed or not")
-	isPipe := cli.Bool("pipe", false, "whether the argument passed via stdin (TRUE) or argument (FALSE)")
-	cli.Parse(args)
-
-	var f io.Writer
-	f = os.Stdout
-	if *outputFile != "-" {
-		of, err := os.Create(*outputFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to open output file: %v\n", err)
-			os.Exit(1)
-		}
-		defer of.Close()
-		f = of
-	}
-	f.Write([]byte("Got executed\n"))
-
-	var message []byte
-	if *isPipe {
-		var err error
-
-		pipe := os.NewFile(3, "/proc/self/fd/3")
-		defer pipe.Close()
-		metadata, err := ioutil.ReadAll(pipe)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read metadata from pipe: %v", err)
-			os.Exit(1)
-		}
-
-		f.Write(metadata)
-		f.Write([]byte("\n"))
-
-		message, err = ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to read body from pipe: %v", err)
-			os.Exit(1)
-		}
-	} else {
-		message = []byte(os.Args[len(os.Args)-1])
-	}
-
-	f.Write(message)
-	f.Write([]byte("\n"))
-
-	if !*isPipe {
-		var r io.Reader
-		r = base64.NewDecoder(base64.StdEncoding, bytes.NewBuffer(message))
-		if *isCompressed {
-			zr, err := zlib.NewReader(r)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to create zlib reader: %v\n", err)
-				os.Exit(1)
-			}
-			defer zr.Close()
-			r = zr
-		}
-		original, err := ioutil.ReadAll(r)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to decompress input: %v\n", err)
-			os.Exit(1)
-		}
-		f.Write(original)
-		f.Write([]byte("\n"))
-	}
-}
-
-func newConnection(url string) (*amqp.Connection, error) {
+func connect(url string) (*amqp.Connection, error) {
 	timeout := time.After(10 * time.Second)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	for {
@@ -271,36 +170,53 @@ func newConnection(url string) (*amqp.Connection, error) {
 	}
 }
 
-func declareQueue(t *testing.T, ch *amqp.Channel, name string) amqp.Queue {
+func declareQueueAndPublish(t *testing.T, ch *amqp.Channel, name string, msg amqp.Publishing) {
 	q, err := ch.QueueDeclare(name, true, false, false, false, nil)
 	if err != nil {
 		t.Errorf("failed to declare queue; %v", err)
 	}
-	return q
+
+	err = ch.Publish("", q.Name, false, false, msg)
+	if err != nil {
+		t.Errorf("failed to publish message: %v", err)
+	}
 }
 
-func newCommand(env []string, arg ...string) (cmd *exec.Cmd, stdout *bytes.Buffer, stderr *bytes.Buffer) {
+func startConsumer(t *testing.T, env []string, arg ...string) (cmd *exec.Cmd, stdout *bytes.Buffer, stderr *bytes.Buffer) {
 	stdout = &bytes.Buffer{}
 	stderr = &bytes.Buffer{}
 	cmd = exec.Command("./rabbitmq-cli-consumer", arg...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.Env = append(append(os.Environ(), "GO_WANT_HELPER_PROCESS=1"), env...)
+
+	if err := cmd.Start(); err != nil {
+		t.Errorf("failed to start consumer: %v", err)
+	}
+
 	return cmd, stdout, stderr
 }
 
-func waitMessageProcessed(buf *bytes.Buffer) bool {
+func stopConsumer(t *testing.T, cmd *exec.Cmd) {
+	if err := cmd.Process.Kill(); err != nil {
+		t.Errorf("failed to stop consumer: %v", err)
+	}
+}
+
+func waitMessageProcessed(t *testing.T, buf *bytes.Buffer) {
 	timeout := time.After(10 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-timeout:
-			ticker.Stop()
-			return true
+			t.Error("timeout while waiting for message processing")
+			return
 
 		case <-ticker.C:
 			if strings.Contains(buf.String(), "Processed!") {
-				return false
+				return
 			}
 		}
 	}
