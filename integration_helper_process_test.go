@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 )
@@ -20,6 +21,7 @@ func TestHelperProcess(t *testing.T) {
 		return
 	}
 	defer os.Exit(0)
+	log.SetFlags(0)
 
 	flags, args := flagsAndArgs()
 	outputFile := flags.String("output", "./command.log", "the output file")
@@ -29,32 +31,19 @@ func TestHelperProcess(t *testing.T) {
 
 	f, err := outputWriter(*outputFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open output file: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("failed to open output file: %v\n", err)
 	}
 	defer f.Close()
 
-	f.Write([]byte("Got executed\n"))
+	writeLine(f, []byte("Got executed"))
 
-	body, meta, err := payload(*isPipe, args)
+	first, second, err := payload(*isPipe, *isCompressed, args)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if meta != nil {
-		writeLine(f, meta)
+		log.Fatalln(err)
 	}
 
-	writeLine(f, body)
-
-	if !*isPipe {
-		original, err := decode(body, *isCompressed)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		writeLine(f, original)
-	}
+	writeLine(f, first)
+	writeLine(f, second)
 }
 
 func flagsAndArgs() (*flag.FlagSet, []string) {
@@ -78,26 +67,38 @@ func outputWriter(file string) (*os.File, error) {
 	return os.Create(file)
 }
 
-func payload(isPipe bool, args []string) ([]byte, []byte, error) {
+func payload(isPipe, comp bool, args []string) ([]byte, []byte, error) {
 	if !isPipe {
-		return []byte(args[len(args)-1]), nil, nil
+		return payloadArgument(comp, args)
 	}
 
-	var err error
+	return payloadPipe()
+}
 
+func payloadArgument(comp bool, args []string) ([]byte, []byte, error) {
+	first := []byte(args[len(args)-1])
+	second, err := decode(first, comp)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return first, second, nil
+}
+
+func payloadPipe() ([]byte, []byte, error) {
 	pipe := os.NewFile(3, "/proc/self/fd/3")
 	defer pipe.Close()
-	meta, err := ioutil.ReadAll(pipe)
+	first, err := ioutil.ReadAll(pipe)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read metadata from pipe: %v", err)
 	}
 
-	body, err := ioutil.ReadAll(os.Stdin)
+	second, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read body from pipe: %v", err)
 	}
 
-	return body, meta, nil
+	return first, second, nil
 }
 
 func writeLine(w io.Writer, p []byte) (int, error) {
@@ -117,7 +118,7 @@ func decode(body []byte, comp bool) ([]byte, error) {
 	if comp {
 		zr, err := zlib.NewReader(r)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create zlib reader: %v\n", err)
+			return nil, fmt.Errorf("failed to create zlib reader: %v", err)
 		}
 		defer zr.Close()
 		r = zr
