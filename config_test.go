@@ -8,6 +8,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer"
+	"github.com/stretchr/testify/assert"
 )
 
 var loadConfigurationTest = []struct {
@@ -73,11 +74,11 @@ func TestLoadConfiguration(t *testing.T) {
 			test.flags(set)
 			c := cli.NewContext(app, set, nil)
 			cfg, err := main.LoadConfiguration(c)
-			tassert.Equal(t, err, test.err)
+			assert.Equal(t, err, test.err)
 			if test.err == nil {
-				tassert.NotNil(t, cfg)
-				tassert.Equal(t, cfg.RabbitMq.AmqpUrl, test.url)
-				tassert.Equal(t, cfg.RabbitMq.Queue, test.queue)
+				assert.NotNil(t, cfg)
+				assert.Equal(t, cfg.RabbitMq.AmqpUrl, test.url)
+				assert.Equal(t, cfg.RabbitMq.Queue, test.queue)
 			}
 		})
 	}
