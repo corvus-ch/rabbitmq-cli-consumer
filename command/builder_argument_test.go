@@ -89,22 +89,8 @@ func TestArgumentBuilder_GetCommand(t *testing.T) {
 			assert.Nil(t, cmd.Stdin)
 			assert.Nil(t, cmd.ExtraFiles)
 			assert.Equal(t, os.Environ(), cmd.Env)
-			if test.capture {
-				outW, ok := cmd.Stdout.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDOUT to be of type *command.LogWriter")
-				}
-				assert.Equal(t, outLog, outW.Logger)
-
-				errW, ok := cmd.Stderr.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDERR to be of type *command.LogWriter")
-				}
-				assert.Equal(t, errLog, errW.Logger)
-			} else {
-				assert.Nil(t, cmd.Stdout)
-				assert.Nil(t, cmd.Stderr)
-			}
+			assertLogger(t, outLog, cmd.Stdout, test.capture)
+			assertLogger(t, errLog, cmd.Stdout, test.capture)
 		})
 	}
 }

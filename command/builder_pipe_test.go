@@ -59,22 +59,8 @@ func TestPipeBuilder_GetCommand(t *testing.T) {
 			metadata, _ := ioutil.ReadAll(cmd.ExtraFiles[0])
 			assert.Equal(t, emptyPropertiesString, string(metadata))
 			assert.Equal(t, os.Environ(), cmd.Env)
-			if test.capture {
-				outW, ok := cmd.Stdout.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDOUT to be of type *command.LogWriter")
-				}
-				assert.Equal(t, outLog, outW.Logger)
-
-				errW, ok := cmd.Stderr.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDERR to be of type *command.LogWriter")
-				}
-				assert.Equal(t, errLog, errW.Logger)
-			} else {
-				assert.Nil(t, cmd.Stdout)
-				assert.Nil(t, cmd.Stderr)
-			}
+			assertLogger(t, outLog, cmd.Stdout, test.capture)
+			assertLogger(t, errLog, cmd.Stdout, test.capture)
 		})
 	}
 }
