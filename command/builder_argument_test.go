@@ -1,14 +1,11 @@
 package command_test
 
 import (
-	"bytes"
-	"log"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,45 +63,17 @@ var argumentBuilderGetCommandTests = []struct {
 func TestArgumentBuilder_GetCommand(t *testing.T) {
 	for _, test := range argumentBuilderGetCommandTests {
 		t.Run(test.name, func(t *testing.T) {
-			outLog := log.New(&bytes.Buffer{}, "", 0)
-			errLog := log.New(&bytes.Buffer{}, "", 0)
-			b, err := command.NewBuilder(&command.ArgumentBuilder{
+			b, outLog, errLog := createAndAssertBuilder(t, &command.ArgumentBuilder{
 				Compressed:   test.compressed,
 				WithMetadata: test.withMetadata,
-			}, test.name, test.capture, outLog, errLog)
-
-			if err != nil {
-				t.Errorf("failed to create builder: %v", err)
-			}
-
-			c, err := b.GetCommand(metadata.Properties{}, metadata.DeliveryInfo{}, []byte(test.name))
-			if err != nil {
-				t.Errorf("failed to create command: %v", err)
-			}
-
-			assert.IsType(t, &command.ExecCommand{}, c)
-
-			cmd := c.Cmd()
+			}, test.name, test.capture)
+			cmd := createAndAssertCommand(t, b, []byte(test.name))
 			assert.Equal(t, append(strings.Split(test.name, " "), test.arg), cmd.Args)
 			assert.Nil(t, cmd.Stdin)
 			assert.Nil(t, cmd.ExtraFiles)
 			assert.Equal(t, os.Environ(), cmd.Env)
-			if test.capture {
-				outW, ok := cmd.Stdout.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDOUT to be of type *command.LogWriter")
-				}
-				assert.Equal(t, outLog, outW.Logger)
-
-				errW, ok := cmd.Stderr.(*command.LogWriter)
-				if !ok {
-					t.Errorf("expected STDERR to be of type *command.LogWriter")
-				}
-				assert.Equal(t, errLog, errW.Logger)
-			} else {
-				assert.Nil(t, cmd.Stdout)
-				assert.Nil(t, cmd.Stderr)
-			}
+			assertLogger(t, outLog, cmd.Stdout, test.capture)
+			assertLogger(t, errLog, cmd.Stdout, test.capture)
 		})
 	}
 }
