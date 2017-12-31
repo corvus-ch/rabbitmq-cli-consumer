@@ -12,7 +12,7 @@ import (
 )
 
 // flags is the list of global flags known to the application.
-var flags = []cli.Flag {
+var flags = []cli.Flag{
 	cli.StringFlag{
 		Name:   "url, u",
 		Usage:  "Connect with RabbitMQ using `URL`",

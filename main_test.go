@@ -1,15 +1,15 @@
 package main_test
 
 import (
+	"bytes"
+	"fmt"
+	"io/ioutil"
+	"syscall"
 	"testing"
 
 	main "github.com/corvus-ch/rabbitmq-cli-consumer"
 	consumerCommand "github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/magiconair/properties/assert"
-	"bytes"
-	"io/ioutil"
-	"syscall"
-	"fmt"
 )
 
 func TestCreateBuilder(t *testing.T) {
@@ -47,10 +47,10 @@ func TestCreateBuilder(t *testing.T) {
 
 func TestCreateLogger(t *testing.T) {
 	tests := []struct {
-		name string
-		verbose bool
+		name       string
+		verbose    bool
 		noDateTime bool
-		flags int
+		flags      int
 	}{
 		{"default", false, false, 3},
 		{"verbose", true, false, 3},
