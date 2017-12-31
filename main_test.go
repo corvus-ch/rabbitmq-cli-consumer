@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer"
 	cmd "github.com/corvus-ch/rabbitmq-cli-consumer/command"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/magiconair/properties/assert"
 	"github.com/pkg/errors"
 	tassert "github.com/stretchr/testify/assert"
@@ -88,6 +90,51 @@ func TestCreateLogger(t *testing.T) {
 			}
 			assert.Equal(t, l.Flags(), test.flags)
 
+		})
+	}
+}
+
+var loggersTests = []struct {
+	name   string
+	config string
+	err    string
+}{
+	{
+		"noErrorFile",
+		"",
+		"failed creating error log: open : no such file or directory",
+	},
+	{
+		"noOutFile",
+		`[logs]
+error = ./error.log
+`,
+		"failed creating info log: open : no such file or directory",
+	},
+	{
+		"success",
+		`[logs]
+error = ./error.log
+info = ./info.log
+`,
+		"",
+	},
+}
+
+func TestLoggers(t *testing.T) {
+	set := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	c := cli.NewContext(nil, set, nil)
+	for _, test := range loggersTests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg, _ := config.CreateFromString(test.config)
+			outLog, errLog, err := main.Loggers(c, cfg)
+			if len(test.err) > 0 {
+				tassert.Equal(t, err.Error(), test.err)
+			} else {
+				tassert.Nil(t, err)
+				tassert.NotNil(t, outLog)
+				tassert.NotNil(t, errLog)
+			}
 		})
 	}
 }
