@@ -80,35 +80,14 @@ func NewApp() *cli.App {
 
 // Action is the function being run when the application gets executed.
 func Action(c *cli.Context) error {
-	if c.String("configuration") == "" && c.String("executable") == "" {
-		cli.ShowAppHelp(c)
-		return cli.NewExitError("", 1)
-	}
-
-	verbose := c.Bool("verbose")
-
-	cfg, err := config.LoadAndParse(c.String("configuration"))
+	cfg, err := LoadConfiguration(c)
 	if err != nil {
-		return fmt.Errorf("failed parsing configuration: %s", err)
+		return err
 	}
 
-	url := c.String("url")
-	if len(url) > 0 {
-		cfg.RabbitMq.AmqpUrl = url
-	}
-
-	errLogger, err := CreateLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
+	infLogger, errLogger, err := Loggers(c, cfg)
 	if err != nil {
-		return fmt.Errorf("failed creating error log: %s", err)
-	}
-
-	infLogger, err := CreateLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
-	if err != nil {
-		return fmt.Errorf("failed creating info log: %s", err)
-	}
-
-	if c.String("queue-name") != "" {
-		cfg.RabbitMq.Queue = c.String("queue-name")
+		return err
 	}
 
 	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
@@ -162,6 +141,22 @@ func CreateBuilder(pipe, compression, metadata bool) command.Builder {
 	}
 }
 
+// Loggers creates the output and error loggers.
+func Loggers(c *cli.Context, cfg *config.Config) (*log.Logger, *log.Logger, error) {
+	verbose := c.Bool("verbose")
+	errLogger, err := CreateLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed creating error log: %s", err)
+	}
+
+	infLogger, err := CreateLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed creating info log: %s", err)
+	}
+
+	return infLogger, errLogger, nil
+}
+
 // CreateLogger creates a new logger instance which writes to the given file.
 // If verbose is set to true, in addition to the file, the logger will also write to writer passed as the out argument.
 func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
@@ -185,4 +180,28 @@ func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool)
 	}
 
 	return log.New(io.MultiWriter(writers...), "", flags), nil
+}
+
+// LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
+func LoadConfiguration(c *cli.Context) (*config.Config, error) {
+	if c.String("configuration") == "" && c.String("executable") == "" {
+		cli.ShowAppHelp(c)
+		return nil, cli.NewExitError("", 1)
+	}
+
+	cfg, err := config.LoadAndParse(c.String("configuration"))
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing configuration: %s", err)
+	}
+
+	url := c.String("url")
+	if len(url) > 0 {
+		cfg.RabbitMq.AmqpUrl = url
+	}
+
+	if c.String("queue-name") != "" {
+		cfg.RabbitMq.Queue = c.String("queue-name")
+	}
+
+	return cfg, nil
 }
