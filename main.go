@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -72,49 +73,27 @@ func NewApp() *cli.App {
 	app.Version = "1.4.2"
 	app.Flags = flags
 	app.Action = Action
+	app.ExitErrHandler = ExitErrHandler
 
 	return app
 }
 
 // Action is the function being run when the application gets executed.
-func Action(c *cli.Context) {
-	if c.String("configuration") == "" && c.String("executable") == "" {
-		cli.ShowAppHelp(c)
-		os.Exit(1)
-	}
-
-	verbose := c.Bool("verbose")
-
-	logger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
-	cfg, err := config.LoadAndParse(c.String("configuration"))
-
+func Action(c *cli.Context) error {
+	cfg, err := LoadConfiguration(c)
 	if err != nil {
-		logger.Fatalf("Failed parsing configuration: %s\n", err)
+		return err
 	}
 
-	url := c.String("url")
-	if len(url) > 0 {
-		cfg.RabbitMq.AmqpUrl = url
-	}
-
-	errLogger, err := CreateLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
+	infLogger, errLogger, err := Loggers(c, cfg)
 	if err != nil {
-		logger.Fatalf("Failed creating error log: %s", err)
-	}
-
-	infLogger, err := CreateLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
-	if err != nil {
-		logger.Fatalf("Failed creating info log: %s", err)
-	}
-
-	if c.String("queue-name") != "" {
-		cfg.RabbitMq.Queue = c.String("queue-name")
+		return err
 	}
 
 	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
 	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), infLogger, errLogger)
 	if err != nil {
-		logger.Fatalf("failed to create command builder: %v", err)
+		return fmt.Errorf("failed to create command builder: %v", err)
 	}
 
 	ack := consumer.NewAcknowledger(c.Bool("strict-exit-code"), cfg.RabbitMq.Onfailure)
@@ -125,6 +104,27 @@ func Action(c *cli.Context) {
 	}
 
 	client.Consume()
+
+	return nil
+}
+
+// ExitErrHandler is a global error handler registered with the application.
+func ExitErrHandler(_ *cli.Context, err error) {
+	if err == nil {
+		return
+	}
+
+	code := 1
+
+	if err.Error() != "" {
+		log.Printf("%+v\n", err)
+	}
+
+	if exitErr, ok := err.(cli.ExitCoder); ok {
+		code = exitErr.ExitCode()
+	}
+
+	os.Exit(code)
 }
 
 // CreateBuilder creates a new empty instance of command.Builder.
@@ -139,6 +139,22 @@ func CreateBuilder(pipe, compression, metadata bool) command.Builder {
 		Compressed:   compression,
 		WithMetadata: metadata,
 	}
+}
+
+// Loggers creates the output and error loggers.
+func Loggers(c *cli.Context, cfg *config.Config) (*log.Logger, *log.Logger, error) {
+	verbose := c.Bool("verbose")
+	errLogger, err := CreateLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed creating error log: %s", err)
+	}
+
+	infLogger, err := CreateLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed creating info log: %s", err)
+	}
+
+	return infLogger, errLogger, nil
 }
 
 // CreateLogger creates a new logger instance which writes to the given file.
@@ -164,4 +180,28 @@ func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool)
 	}
 
 	return log.New(io.MultiWriter(writers...), "", flags), nil
+}
+
+// LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
+func LoadConfiguration(c *cli.Context) (*config.Config, error) {
+	if c.String("configuration") == "" && c.String("executable") == "" {
+		cli.ShowAppHelp(c)
+		return nil, cli.NewExitError("", 1)
+	}
+
+	cfg, err := config.LoadAndParse(c.String("configuration"))
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing configuration: %s", err)
+	}
+
+	url := c.String("url")
+	if len(url) > 0 {
+		cfg.RabbitMq.AmqpUrl = url
+	}
+
+	if c.String("queue-name") != "" {
+		cfg.RabbitMq.Queue = c.String("queue-name")
+	}
+
+	return cfg, nil
 }
