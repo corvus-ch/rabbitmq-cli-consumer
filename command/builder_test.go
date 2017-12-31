@@ -1,6 +1,7 @@
 package command_test
 
 import (
+	"bytes"
 	"io"
 	"log"
 	"os/exec"
@@ -9,7 +10,6 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/stretchr/testify/assert"
-	"bytes"
 )
 
 func assertLogger(t *testing.T, exp *log.Logger, got io.Writer, captured bool) {
