@@ -1,9 +1,7 @@
 package command_test
 
 import (
-	"bytes"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"testing"
@@ -35,13 +33,7 @@ var pipeBuilderGetCommandtests = []struct {
 func TestPipeBuilder_GetCommand(t *testing.T) {
 	for _, test := range pipeBuilderGetCommandtests {
 		t.Run(test.name, func(t *testing.T) {
-			outLog := log.New(&bytes.Buffer{}, "", 0)
-			errLog := log.New(&bytes.Buffer{}, "", 0)
-			b, err := command.NewBuilder(&command.PipeBuilder{}, test.name, test.capture, outLog, errLog)
-			if err != nil {
-				t.Errorf("failed to create builder: %v", err)
-			}
-
+			b, outLog, errLog := createAndAssertBuilder(t, &command.PipeBuilder{}, test.name, test.capture)
 			cmd := createAndAssertCommand(t, b, []byte(test.name))
 			assert.Equal(t, strings.Split(test.name, " "), cmd.Args)
 			assert.NotNil(t, cmd.Stdin)

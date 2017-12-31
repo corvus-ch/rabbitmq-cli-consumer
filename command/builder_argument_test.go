@@ -1,8 +1,6 @@
 package command_test
 
 import (
-	"bytes"
-	"log"
 	"os"
 	"strings"
 	"testing"
@@ -65,17 +63,10 @@ var argumentBuilderGetCommandTests = []struct {
 func TestArgumentBuilder_GetCommand(t *testing.T) {
 	for _, test := range argumentBuilderGetCommandTests {
 		t.Run(test.name, func(t *testing.T) {
-			outLog := log.New(&bytes.Buffer{}, "", 0)
-			errLog := log.New(&bytes.Buffer{}, "", 0)
-			b, err := command.NewBuilder(&command.ArgumentBuilder{
+			b, outLog, errLog := createAndAssertBuilder(t, &command.ArgumentBuilder{
 				Compressed:   test.compressed,
 				WithMetadata: test.withMetadata,
-			}, test.name, test.capture, outLog, errLog)
-
-			if err != nil {
-				t.Errorf("failed to create builder: %v", err)
-			}
-
+			}, test.name, test.capture)
 			cmd := createAndAssertCommand(t, b, []byte(test.name))
 			assert.Equal(t, append(strings.Split(test.name, " "), test.arg), cmd.Args)
 			assert.Nil(t, cmd.Stdin)
