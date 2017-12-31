@@ -117,7 +117,7 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	code := 1
 
 	if err.Error() != "" {
-		log.Println(err)
+		log.Printf("%+v\n", err)
 	}
 
 	if exitErr, ok := err.(cli.ExitCoder); ok {
