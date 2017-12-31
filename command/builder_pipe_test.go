@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,14 +42,7 @@ func TestPipeBuilder_GetCommand(t *testing.T) {
 				t.Errorf("failed to create builder: %v", err)
 			}
 
-			c, err := b.GetCommand(metadata.Properties{}, metadata.DeliveryInfo{}, []byte(test.name))
-			if err != nil {
-				t.Errorf("failed to create command: %v", err)
-			}
-
-			assert.IsType(t, &command.ExecCommand{}, c)
-
-			cmd := c.Cmd()
+			cmd := createAndAssertCommand(t, b, []byte(test.name))
 			assert.Equal(t, strings.Split(test.name, " "), cmd.Args)
 			assert.NotNil(t, cmd.Stdin)
 			input, _ := ioutil.ReadAll(cmd.Stdin)
