@@ -125,7 +125,7 @@ var exitErrHandlerTests = []struct {
 	{
 		"outputFormatted",
 		errors.WithMessage(fmt.Errorf("error"), "nested"),
-		"error\nnested\n",
+		"nested: error\n",
 		"os.Exit called with: 1",
 	},
 }

@@ -129,6 +129,7 @@ func Action(c *cli.Context) error {
 	return nil
 }
 
+// ExitErrHandler is a global error handler registered with the application.
 func ExitErrHandler(_ *cli.Context, err error) {
 	if err == nil {
 		return
@@ -137,11 +138,7 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	code := 1
 
 	if err.Error() != "" {
-		if _, ok := err.(cli.ErrorFormatter); ok {
-			log.Printf("%+v\n", err)
-		} else {
-			log.Println(err)
-		}
+		log.Println(err)
 	}
 
 	if exitErr, ok := err.(cli.ExitCoder); ok {
