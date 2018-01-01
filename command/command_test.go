@@ -68,6 +68,24 @@ func TestHelperProcess(t *testing.T) {
 	}
 	defer os.Exit(0)
 
+	args := helperProcessArgs()
+	helperProcessAssertArgs(args)
+
+	cmd, args := args[0], args[1:]
+	switch cmd {
+	case "echo":
+		helperProcessCmdEcho(args, 0)
+
+	case "error":
+		helperProcessCmdEcho(args, 1)
+
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command %q\n", cmd)
+		os.Exit(2)
+	}
+}
+
+func helperProcessArgs() []string {
 	args := os.Args
 	for len(args) > 0 {
 		if args[0] == "--" {
@@ -76,27 +94,20 @@ func TestHelperProcess(t *testing.T) {
 		}
 		args = args[1:]
 	}
+
+	return args
+}
+
+func helperProcessAssertArgs(args []string) {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "No command\n")
+		fmt.Fprintln(os.Stderr, "No command")
 		os.Exit(2)
 	}
+}
 
-	cmd, args := args[0], args[1:]
-	switch cmd {
-	case "echo":
-		for _, a := range args {
-			fmt.Println(a)
-		}
-		os.Exit(0)
-
-	case "error":
-		for _, a := range args {
-			fmt.Println(a)
-		}
-		os.Exit(1)
-
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command %q\n", cmd)
-		os.Exit(2)
+func helperProcessCmdEcho(args []string, code int) {
+	for _, a := range args {
+		fmt.Println(a)
 	}
+	os.Exit(0)
 }
