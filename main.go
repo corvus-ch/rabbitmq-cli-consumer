@@ -12,6 +12,8 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 )
 
+var version = "undefined"
+
 // flags is the list of global flags known to the application.
 var flags = []cli.Flag{
 	cli.StringFlag{
@@ -70,7 +72,7 @@ func NewApp() *cli.App {
 		{"Richard van den Brand", "richard@vandenbrand.org"},
 		{"Christian Häusler", "haeusler.christian@mac.com"},
 	}
-	app.Version = "1.4.2"
+	app.Version = version
 	app.Flags = flags
 	app.Action = Action
 	app.ExitErrHandler = ExitErrHandler
