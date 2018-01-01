@@ -66,7 +66,7 @@ const ttlConfig = `[rabbitmq]
 var amqpTable amqp.Table
 
 var queueTests = []struct {
-	name string
+	name   string
 	config string
 	setup  func(*TestChannel)
 	err    error
