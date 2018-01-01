@@ -74,7 +74,7 @@ func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.
 
 // New returns a initialized consumer based on config
 func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogger, infLogger *log.Logger) (*Consumer, error) {
-	conn, err := NewRabbitMqConnection(cfg, infLogger, errLogger)
+	conn, err := NewConnection(cfg, infLogger, errLogger)
 	if err != nil {
 		return nil, err
 	}

@@ -32,7 +32,8 @@ type rabbitMqConnection struct {
 	errLog *log.Logger
 }
 
-func NewRabbitMqConnection(cfg *config.Config, outLog, errLog *log.Logger) (Connection, error) {
+// NewConnection creates a new implementing instance of the connection interface.
+func NewConnection(cfg *config.Config, outLog, errLog *log.Logger) (Connection, error) {
 	outLog.Println("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
