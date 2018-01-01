@@ -109,5 +109,5 @@ func helperProcessCmdEcho(args []string, code int) {
 	for _, a := range args {
 		fmt.Println(a)
 	}
-	os.Exit(0)
+	os.Exit(code)
 }
