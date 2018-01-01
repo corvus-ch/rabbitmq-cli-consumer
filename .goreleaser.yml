@@ -1,0 +1,13 @@
+project_name: rabbitmq-cli-consumer
+
+builds:
+  - binary: rabbitmq-cli-consumer
+    goos:
+      - windows
+      - darwin
+      - linux
+
+release:
+  github:
+    owner: corvus-ch
+    name: rabbitmq-cli-consumer
