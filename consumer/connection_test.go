@@ -66,12 +66,14 @@ const ttlConfig = `[rabbitmq]
 var amqpTable amqp.Table
 
 var queueTests = []struct {
+	name string
 	config string
 	setup  func(*TestChannel)
 	err    error
 }{
 	// The happy path.
 	{
+		"happyPath",
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, true).Return(nil).Once()
@@ -83,6 +85,7 @@ var queueTests = []struct {
 	},
 	// Define queue with TTL.
 	{
+		"queueWithTTL",
 		ttlConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, true).Return(nil).Once()
@@ -94,6 +97,7 @@ var queueTests = []struct {
 	},
 	// Set QoS fails.
 	{
+		"setQosFail",
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, true).Return(fmt.Errorf("QoS error")).Once()
@@ -102,6 +106,7 @@ var queueTests = []struct {
 	},
 	// Declare queue fails.
 	{
+		"declareQueueFail",
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, true).Return(nil).Once()
@@ -109,8 +114,20 @@ var queueTests = []struct {
 		},
 		fmt.Errorf("failed to declare queue: queue error"),
 	},
+	// Declare exchange fails.
+	{
+		"declareExchangeFail",
+		defaultConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("QueueDeclare", "worker", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "worker", "test", true, false, false, false, amqp.Table{}).Return(fmt.Errorf("declare exchagne error")).Once()
+		},
+		fmt.Errorf("failed to declare exchange: declare exchagne error"),
+	},
 	// Bind queue fails.
 	{
+		"bindQueueFail",
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, true).Return(nil).Once()
@@ -124,28 +141,27 @@ var queueTests = []struct {
 
 func TestQueueSettings(t *testing.T) {
 	for _, test := range queueTests {
-		cfg, err := config.CreateFromString(test.config)
-		if err != nil {
-			t.Errorf("failed to create config: %v", err)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			cfg, _ := config.CreateFromString(test.config)
 
-		var b bytes.Buffer
-		infLogger := log.New(&b, "", 0)
-		errLogger := log.New(&b, "", 0)
+			var b bytes.Buffer
+			infLogger := log.New(&b, "", 0)
+			errLogger := log.New(&b, "", 0)
 
-		ch := new(TestChannel)
+			ch := new(TestChannel)
 
-		test.setup(ch)
+			test.setup(ch)
 
-		conn := &rabbitMqConnection{
-			cfg:    cfg,
-			ch:     ch,
-			outLog: infLogger,
-			errLog: errLogger,
-		}
+			conn := &rabbitMqConnection{
+				cfg:    cfg,
+				ch:     ch,
+				outLog: infLogger,
+				errLog: errLogger,
+			}
 
-		assert.Equal(t, test.err, conn.Setup())
-		ch.AssertExpectations(t)
+			assert.Equal(t, test.err, conn.Setup())
+			ch.AssertExpectations(t)
+		})
 	}
 }
 
