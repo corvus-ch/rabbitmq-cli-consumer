@@ -13,9 +13,7 @@ import (
 )
 
 type Consumer struct {
-	Channel         *amqp.Channel
-	Connection      *amqp.Connection
-	Queue           string
+	Connection      Connection
 	Builder         command.Builder
 	Acknowledger    Acknowledger
 	ErrLogger       *log.Logger
@@ -34,7 +32,7 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 // Consume subscribes itself to the message queue and starts consuming messages.
 func (c *Consumer) Consume() {
 	c.InfLogger.Println("Registering consumer... ")
-	msgs, err := c.Channel.Consume(c.Queue, "", false, false, false, false, nil)
+	msgs, err := c.Connection.Consume()
 	if err != nil {
 		c.ErrLogger.Fatalf("Failed to register a consumer: %s", err)
 	}
@@ -42,7 +40,6 @@ func (c *Consumer) Consume() {
 	c.InfLogger.Println("Succeeded registering consumer.")
 
 	defer c.Connection.Close()
-	defer c.Channel.Close()
 
 	closeErr := make(chan *amqp.Error)
 	closeErr = c.Connection.NotifyClose(closeErr)
@@ -80,94 +77,23 @@ func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.
 
 // New returns a initialized consumer based on config
 func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogger, infLogger *log.Logger) (*Consumer, error) {
-	infLogger.Println("Connecting RabbitMQ...")
-	conn, err := amqp.Dial(cfg.AmqpUrl())
-	if nil != err {
-		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
+	conn, err := NewRabbitMqConnection(cfg, infLogger, errLogger)
+	if err != nil {
+		return nil, err
 	}
-	infLogger.Println("Connected.")
 
-	infLogger.Println("Opening channel...")
-	ch, err := conn.Channel()
-	if nil != err {
-		return nil, fmt.Errorf("failed to open a channel: %v", err)
-	}
-	infLogger.Println("Done.")
-
-	if err := Initialize(cfg, ch, errLogger, infLogger); err != nil {
+	if err := conn.Setup(); err != nil {
 		return nil, err
 	}
 
 	return &Consumer{
-		Channel:      ch,
 		Connection:   conn,
-		Queue:        cfg.RabbitMq.Queue,
 		Builder:      builder,
 		Acknowledger: ack,
 		ErrLogger:    errLogger,
 		InfLogger:    infLogger,
 		Compression:  cfg.RabbitMq.Compression,
 	}, nil
-}
-
-// Initialize channel according to config
-func Initialize(cfg *config.Config, ch Channel, errLogger, infLogger *log.Logger) error {
-	infLogger.Println("Setting QoS... ")
-
-	if err := ch.Qos(cfg.PrefetchCount(), 0, cfg.Prefetch.Global); err != nil {
-		return fmt.Errorf("failed to set QoS: %v", err)
-	}
-
-	infLogger.Println("Succeeded setting QoS.")
-
-	infLogger.Printf("Declaring queue \"%s\"...", cfg.RabbitMq.Queue)
-	_, err := ch.QueueDeclare(cfg.RabbitMq.Queue, true, false, false, false, queueArgs(cfg))
-	if nil != err {
-		return fmt.Errorf("failed to declare queue: %v", err)
-	}
-
-	// Empty Exchange name means default, no need to declare
-	if cfg.HasExchange() {
-		infLogger.Printf("Declaring exchange \"%s\"...", cfg.Exchange.Name)
-		err = ch.ExchangeDeclare(cfg.Exchange.Name, cfg.ExchangeType(), cfg.Exchange.Durable, cfg.Exchange.Autodelete, false, false, amqp.Table{})
-
-		if nil != err {
-			return fmt.Errorf("failed to declare exchange: %v", err)
-		}
-
-		// Bind queue
-		infLogger.Printf("Binding queue \"%s\" to exchange \"%s\"...", cfg.RabbitMq.Queue, cfg.Exchange.Name)
-		err = ch.QueueBind(cfg.RabbitMq.Queue, cfg.RoutingKey(), cfg.ExchangeName(), false, nil)
-
-		if nil != err {
-			return fmt.Errorf("failed to bind queue to exchange: %v", err)
-		}
-	}
-
-	return nil
-}
-
-func queueArgs(cfg *config.Config) amqp.Table {
-
-	args := make(amqp.Table)
-
-	if cfg.HasMessageTTL() {
-		args["x-message-ttl"] = cfg.MessageTTL()
-	}
-
-	if cfg.HasDeadLetterExchange() {
-		args["x-dead-letter-exchange"] = cfg.DeadLetterExchange()
-
-		if cfg.HasDeadLetterRouting() {
-			args["x-dead-letter-routing-key"] = cfg.DeadLetterRoutingKey()
-		}
-	}
-
-	if len(args) > 0 {
-		return args
-	}
-
-	return nil
 }
 
 type Channel interface {
