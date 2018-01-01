@@ -17,3 +17,6 @@
 
 # test helpers
 cc-test-reporter
+
+# goreleaser
+/dist/
