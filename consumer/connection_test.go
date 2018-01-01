@@ -138,8 +138,8 @@ func TestQueueSettings(t *testing.T) {
 		test.setup(ch)
 
 		conn := &rabbitMqConnection{
-			cfg: cfg,
-			ch:  ch,
+			cfg:    cfg,
+			ch:     ch,
 			outLog: infLogger,
 			errLog: errLogger,
 		}
