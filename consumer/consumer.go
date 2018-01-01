@@ -13,16 +13,14 @@ import (
 )
 
 type Consumer struct {
-	Connection      Connection
-	Builder         command.Builder
-	Acknowledger    Acknowledger
-	ErrLogger       *log.Logger
-	InfLogger       *log.Logger
-	Compression     bool
-	IncludeMetadata bool
-	CaptureOutput   bool
+	Connection   Connection
+	Builder      command.Builder
+	Acknowledger Acknowledger
+	ErrLogger    *log.Logger
+	InfLogger    *log.Logger
 }
 
+// ConnectionCloseHandler calls os.Exit after the connection to RabbitMQ got closed.
 func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 	err := <-closeErr
 	c.ErrLogger.Fatalf("Connection closed: %v", err)
@@ -92,7 +90,6 @@ func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogge
 		Acknowledger: ack,
 		ErrLogger:    errLogger,
 		InfLogger:    infLogger,
-		Compression:  cfg.RabbitMq.Compression,
 	}, nil
 }
 
