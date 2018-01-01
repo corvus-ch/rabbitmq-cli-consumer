@@ -114,32 +114,22 @@ func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogge
 func Initialize(cfg *config.Config, ch Channel, errLogger, infLogger *log.Logger) error {
 	infLogger.Println("Setting QoS... ")
 
-	// Attempt to preserve BC here
-	if cfg.Prefetch.Count == 0 {
-		cfg.Prefetch.Count = 3
-	}
-
-	if err := ch.Qos(cfg.Prefetch.Count, 0, cfg.Prefetch.Global); err != nil {
+	if err := ch.Qos(cfg.PrefetchCount(), 0, cfg.Prefetch.Global); err != nil {
 		return fmt.Errorf("failed to set QoS: %v", err)
 	}
 
 	infLogger.Println("Succeeded setting QoS.")
 
 	infLogger.Printf("Declaring queue \"%s\"...", cfg.RabbitMq.Queue)
-	_, err := ch.QueueDeclare(cfg.RabbitMq.Queue, true, false, false, false, sanitizeQueueArgs(cfg))
+	_, err := ch.QueueDeclare(cfg.RabbitMq.Queue, true, false, false, false, queueArgs(cfg))
 	if nil != err {
 		return fmt.Errorf("failed to declare queue: %v", err)
 	}
 
-	// Check for missing exchange settings to preserve BC
-	if "" == cfg.Exchange.Name && "" == cfg.Exchange.Type && !cfg.Exchange.Durable && !cfg.Exchange.Autodelete {
-		cfg.Exchange.Type = "direct"
-	}
-
 	// Empty Exchange name means default, no need to declare
-	if "" != cfg.Exchange.Name {
+	if cfg.HasExchange() {
 		infLogger.Printf("Declaring exchange \"%s\"...", cfg.Exchange.Name)
-		err = ch.ExchangeDeclare(cfg.Exchange.Name, cfg.Exchange.Type, cfg.Exchange.Durable, cfg.Exchange.Autodelete, false, false, amqp.Table{})
+		err = ch.ExchangeDeclare(cfg.Exchange.Name, cfg.ExchangeType(), cfg.Exchange.Durable, cfg.Exchange.Autodelete, false, false, amqp.Table{})
 
 		if nil != err {
 			return fmt.Errorf("failed to declare exchange: %v", err)
@@ -147,7 +137,7 @@ func Initialize(cfg *config.Config, ch Channel, errLogger, infLogger *log.Logger
 
 		// Bind queue
 		infLogger.Printf("Binding queue \"%s\" to exchange \"%s\"...", cfg.RabbitMq.Queue, cfg.Exchange.Name)
-		err = ch.QueueBind(cfg.RabbitMq.Queue, transformToStringValue(cfg.QueueSettings.Routingkey), transformToStringValue(cfg.Exchange.Name), false, nil)
+		err = ch.QueueBind(cfg.RabbitMq.Queue, cfg.RoutingKey(), cfg.ExchangeName(), false, nil)
 
 		if nil != err {
 			return fmt.Errorf("failed to bind queue to exchange: %v", err)
@@ -157,19 +147,19 @@ func Initialize(cfg *config.Config, ch Channel, errLogger, infLogger *log.Logger
 	return nil
 }
 
-func sanitizeQueueArgs(cfg *config.Config) amqp.Table {
+func queueArgs(cfg *config.Config) amqp.Table {
 
 	args := make(amqp.Table)
 
-	if cfg.QueueSettings.MessageTTL > 0 {
-		args["x-message-ttl"] = int32(cfg.QueueSettings.MessageTTL)
+	if cfg.HasMessageTTL() {
+		args["x-message-ttl"] = cfg.MessageTTL()
 	}
 
-	if cfg.QueueSettings.DeadLetterExchange != "" {
-		args["x-dead-letter-exchange"] = transformToStringValue(cfg.QueueSettings.DeadLetterExchange)
+	if cfg.HasDeadLetterExchange() {
+		args["x-dead-letter-exchange"] = cfg.DeadLetterExchange()
 
-		if cfg.QueueSettings.DeadLetterRoutingKey != "" {
-			args["x-dead-letter-routing-key"] = transformToStringValue(cfg.QueueSettings.DeadLetterRoutingKey)
+		if cfg.HasDeadLetterRouting() {
+			args["x-dead-letter-routing-key"] = cfg.DeadLetterRoutingKey()
 		}
 	}
 
@@ -178,14 +168,6 @@ func sanitizeQueueArgs(cfg *config.Config) amqp.Table {
 	}
 
 	return nil
-}
-
-func transformToStringValue(val string) string {
-	if val == "<empty>" {
-		return ""
-	}
-
-	return val
 }
 
 type Channel interface {
