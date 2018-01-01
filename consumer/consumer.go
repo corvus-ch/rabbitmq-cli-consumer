@@ -1,7 +1,6 @@
 package consumer
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"

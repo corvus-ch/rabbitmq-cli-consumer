@@ -26,7 +26,7 @@ type Connection interface {
 type rabbitMqConnection struct {
 	Connection
 	conn   *amqp.Connection
-	ch     *amqp.Channel
+	ch     Channel
 	cfg    *config.Config
 	outLog *log.Logger
 	errLog *log.Logger

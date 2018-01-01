@@ -1,4 +1,4 @@
-package consumer_test
+package consumer
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -138,7 +137,14 @@ func TestQueueSettings(t *testing.T) {
 
 		test.setup(ch)
 
-		assert.Equal(t, test.err, consumer.Initialize(cfg, ch, errLogger, infLogger))
+		conn := &rabbitMqConnection{
+			cfg: cfg,
+			ch:  ch,
+			outLog: infLogger,
+			errLog: errLogger,
+		}
+
+		assert.Equal(t, test.err, conn.Setup())
 		ch.AssertExpectations(t)
 	}
 }
