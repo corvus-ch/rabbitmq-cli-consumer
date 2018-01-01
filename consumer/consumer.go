@@ -31,6 +31,7 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 	os.Exit(10)
 }
 
+// Consume subscribes itself to the message queue and starts consuming messages.
 func (c *Consumer) Consume() {
 	c.InfLogger.Println("Registering consumer... ")
 	msgs, err := c.Channel.Consume(c.Queue, "", false, false, false, false, nil)
@@ -60,6 +61,7 @@ func (c *Consumer) Consume() {
 	<-forever
 }
 
+// ProcessMessage processes a single message by running the executable.
 func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.DeliveryInfo) {
 	cmd, err := c.Builder.GetCommand(p, m, d.Body())
 	if err != nil {
