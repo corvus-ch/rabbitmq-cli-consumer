@@ -14,8 +14,8 @@ import (
 
 var (
 	version = "dev"
-	commit = "none"
-	date = "unknown"
+	commit  = "none"
+	date    = "unknown"
 )
 
 // flags is the list of global flags known to the application.
