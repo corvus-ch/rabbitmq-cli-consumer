@@ -31,3 +31,6 @@ script:
 
 after_script:
   - ./cc-test-reporter sum-coverage --output - .coverage/*.json | ./cc-test-reporter upload-coverage --input -
+
+after_success:
+  - test -n "${TRAVIS_TAG}" && curl -sL https://git.io/goreleaser | bash
