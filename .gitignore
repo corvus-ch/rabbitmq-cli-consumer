@@ -8,15 +8,12 @@
 # Test binary, build with `go test -c`
 *.test
 
-# Binary generated during integration tests
-/rabbitmq-cli-consumer
-
 # Output of the go coverage tool
 /.coverage/
 *.out
 
-# test helpers
-cc-test-reporter
-
-# goreleaser
+# Test/build helpers and test artifacts
+*.log
 /dist/
+cc-test-reporter
+rabbitmq-cli-consumer
