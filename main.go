@@ -166,14 +166,15 @@ func Loggers(c *cli.Context, cfg *config.Config) (*log.Logger, *log.Logger, erro
 // CreateLogger creates a new logger instance which writes to the given file.
 // If verbose is set to true, in addition to the file, the logger will also write to writer passed as the out argument.
 func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	writers := make([]io.Writer, 0)
+	if len(filename) > 0 || !verbose {
+		file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 
-	if err != nil {
-		return nil, err
-	}
+		if err != nil {
+			return nil, err
+		}
 
-	var writers = []io.Writer{
-		file,
+		writers = append(writers, file)
 	}
 
 	if verbose {
