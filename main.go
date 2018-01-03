@@ -181,12 +181,15 @@ func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool)
 		writers = append(writers, out)
 	}
 
-	flags := log.Ldate | log.Ltime
+	return log.New(io.MultiWriter(writers...), "", loggerFlags(noDateTime)), nil
+}
+
+func loggerFlags(noDateTime bool) int {
 	if noDateTime {
-		flags = 0
+		return 0
 	}
 
-	return log.New(io.MultiWriter(writers...), "", flags), nil
+	return log.Ldate | log.Ltime
 }
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
