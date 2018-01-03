@@ -58,14 +58,16 @@ func TestCreateLogger(t *testing.T) {
 }
 
 var loggersTests = []struct {
-	name   string
-	config string
-	err    string
+	name    string
+	config  string
+	err     string
+	verbose bool
 }{
 	{
 		"noErrorFile",
 		"",
 		"failed creating error log: open : no such file or directory",
+		false,
 	},
 	{
 		"noOutFile",
@@ -73,6 +75,7 @@ var loggersTests = []struct {
 error = ./error.log
 `,
 		"failed creating info log: open : no such file or directory",
+		false,
 	},
 	{
 		"success",
@@ -81,15 +84,23 @@ error = ./error.log
 info = ./info.log
 `,
 		"",
+		false,
+	},
+	{
+		"noLogFiles",
+		"",
+		"",
+		true,
 	},
 }
 
 func TestLoggers(t *testing.T) {
-	set := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
-	c := cli.NewContext(nil, set, nil)
 	for _, test := range loggersTests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg, _ := config.CreateFromString(test.config)
+			set := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+			set.Bool("verbose", test.verbose, "")
+			c := cli.NewContext(nil, set, nil)
 			outLog, errLog, err := main.Loggers(c, cfg)
 			if len(test.err) > 0 {
 				assert.Equal(t, err.Error(), test.err)

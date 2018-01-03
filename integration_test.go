@@ -51,6 +51,13 @@ var tests = []struct {
 		[]string{},
 	},
 	{
+		"noLogs",
+		[]string{"-V", "-no-datetime", "-o", "-e", command + "-output=-", "-c", "fixtures/no_logs.conf"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("noLogs")},
+		[]string{},
+	},
+	{
 		"queueName",
 		[]string{"-V", "-no-datetime", "-q", "altTest", "-e", command, "-c", "fixtures/default.conf"},
 		"altTest",
@@ -153,7 +160,7 @@ func prepare() *amqp.Connection {
 }
 
 func connect(url string) (*amqp.Connection, error) {
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(15 * time.Second)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	for {
 		select {
