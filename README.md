@@ -397,7 +397,7 @@ try {
 
 ## Contributing and license
 
-This library is licenced under [MIT](LICENSE.md). For information about how to
+This library is licenced under [MIT](LICENSE). For information about how to
 contribute to this project, see [CONTRIBUTING.md].
 
 [12factor]: https://12factor.net

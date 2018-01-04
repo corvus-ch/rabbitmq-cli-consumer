@@ -14,6 +14,6 @@ release:
 
 archive:
   files:
-      - LICENSE.md
+      - LICENSE
       - README.md
       - example.conf
