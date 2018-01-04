@@ -11,8 +11,9 @@ Before doing so, please keep the following in mind:
   many friendly places in the internet first. You most probably will not get
   any support here.
 
-If you have found a bug and are willing to fix it yourself, that is great, thanks a lot.
-Your pull request will happily accepted given the following rules are obliged:
+If you have found a bug and are willing to fix it yourself, that is great,
+thanks a lot.  Your pull request will happily accepted given the following
+rules are obliged:
 
 * The bug must be reproduced by adding a test for it.
 * All tests must pass
