@@ -166,26 +166,30 @@ func Loggers(c *cli.Context, cfg *config.Config) (*log.Logger, *log.Logger, erro
 // CreateLogger creates a new logger instance which writes to the given file.
 // If verbose is set to true, in addition to the file, the logger will also write to writer passed as the out argument.
 func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	writers := make([]io.Writer, 0)
+	if len(filename) > 0 || !verbose {
+		file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 
-	if err != nil {
-		return nil, err
-	}
+		if err != nil {
+			return nil, err
+		}
 
-	var writers = []io.Writer{
-		file,
+		writers = append(writers, file)
 	}
 
 	if verbose {
 		writers = append(writers, out)
 	}
 
-	flags := log.Ldate | log.Ltime
+	return log.New(io.MultiWriter(writers...), "", loggerFlags(noDateTime)), nil
+}
+
+func loggerFlags(noDateTime bool) int {
 	if noDateTime {
-		flags = 0
+		return 0
 	}
 
-	return log.New(io.MultiWriter(writers...), "", flags), nil
+	return log.Ldate | log.Ltime
 }
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
