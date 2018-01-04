@@ -391,10 +391,12 @@ try {
 
 ```
 
-## Developing
+## Contributing and license
 
-Missing anything? Found a bug? I love to see your PR.
+This library is licenced under [MIT](LICENSE.md). For information about how to
+contribute to this project, see [CONTRIBUTING.md].
 
+[12factor]: https://12factor.net
+[CONTRIBUTING.md]: https://github.com/corvus-ch/rabbitmq-cli-consumer/blob/master/CONTRIBUTING.md
 [die]: https://software-gunslinger.tumblr.com/post/47131406821/php-is-meant-to-die
 [ricbra]: https://github.com/ricbra
-[12factor]: https://12factor.net
