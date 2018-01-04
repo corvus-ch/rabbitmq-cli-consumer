@@ -11,3 +11,9 @@ release:
   github:
     owner: corvus-ch
     name: rabbitmq-cli-consumer
+
+archive:
+  files:
+      - LICENSE.md
+      - README.md
+      - example.conf

@@ -1,63 +1,51 @@
-RabbitMQ cli consumer
----------------------
+# RabbitMQ cli consumer
 
-If you are a fellow PHP developer just like me you're probably aware of the following fact:
-PHP really SUCKS in long running tasks.
+[![Build Status](https://travis-ci.org/corvus-ch/rabbitmq-cli-consumer.svg?branch=master)](https://travis-ci.org/corvus-ch/rabbitmq-cli-consumer)
+[![Maintainability](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/maintainability)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/maintainability)
+[![Test Coverage](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/test_coverage)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/test_coverage)
 
-When using RabbitMQ with pure PHP consumers you have to deal with stability issues. Probably you are killing your
-consumers regularly. And try to solve the problem with supervisord. Which also means on every deploy you
-have to restart your consumers. A little bit dramatic if you ask me.
+If you are a fellow PHP developer just like me you're probably aware of the
+following fact: [PHP is meant to die][die].
 
-This is a fork of the work done by Richard van den Brand and provides a command that aims to solve the above described
-problem for RabbitMQ workers by delegate the long running part to a tool written in go which is much better suited for
-this task. The PHP application then is only executed when there is an AMQP message to process.
+When using RabbitMQ with pure PHP consumers you have to deal with stability
+issues. Probably you are killing your consumers regularly. And try to solve the
+problem with supervisord. Which also means on every deploy you have to restart
+your consumers. A little bit dramatic if you ask me.
 
-This fork came to be, when Richard van den Brand did no longer had the time to maintain his version. Simplification is
-one of the main goal of this fork and no effort will be made to keep the changes backwards compatible.
+This is a fork of the work done by Richard van den Brand and provides a command
+that aims to solve the above described problem for RabbitMQ workers by delegate
+the long running part to a tool written in go which is much better suited for
+this task. The PHP application then is only executed when there is an AMQP
+message to process. This is comparable to how HTTP requests usually are handled
+where the webs server waits for new incoming requests and calls your script once
+for each request.
 
-- Environment dependent settings should be configurable by environment variables.
-- All logs, including the output of the called scripts, will be written to STDOUT/STDERR.
-- The AMQP message will be passed via STDIN (not as argument limitation in size)
+This fork came to be, when [Richard van den Brand][ricbra] did no longer had
+the time to maintain his version. The main goals of the fork are:
 
-WARNING: This is work in progress and not yet intended to be used in production.
+- Following the principle of [The Twelve-Factor App][12factor] environment
+  dependent settings should be configurable by environment variables.
+- All logs, including the output of the called executable, will be available in
+  STDOUT/STDERR.
+- The AMQP message will be passed via STDIN (not as argument with its
+  limitation in size)
+- Have tests with a decent level of code coverage.
 
-# Installation
+NOTE: If you previously used the consumer of [Richard van den Brand][ricbra],
+this version should work as a drop in replacement. Do not migrate blindly but
+do some testing before. Effort was made to remain backwards compatible, no
+guarantees are made.
 
-You have the choice to either compile yourself or by installing via package or binary.
+## Installation
 
-## APT Package
-
-As I'm a Debian user myself Debian-based peeps are lucky and can use my APT repository.
-
-Add this line to your <code>/etc/apt/sources.list</code> file:
-
-    deb http://apt.vandenbrand.org/debian testing main
-
-Fetch and install GPG key:
-
-    $ wget http://apt.vandenbrand.org/apt.vandenbrand.org.gpg.key
-    $ sudo apt-key add apt.vandenbrand.org.gpg.key
-
-Update and install:
-
-    $ sudo apt-get update
-    $ sudo apt-get install rabbitmq-cli-consumer
-
-## Create .deb package for service install
-
-    sudo apt-get install golang gccgo-go ruby -y
-    # Ubuntu
-    sudo apt-get install gccgo-go -y
-    # Debian
-    sudo apt-get install gccgo -y
-    sudo gem install fpm
-    ./build_service_deb.sh
+You have the choice to either compile yourself or by installing via package or
+binary.
 
 ## Binary
 
-Binaries can be found at: https://github.com/ricbra/rabbitmq-cli-consumer/releases
+Binaries can be found at: https://github.com/corvus-ch/rabbitmq-cli-consumer/releases
 
-## Compiling
+### Compiling
 
 This section assumes you're familiar with the Go language.
 
@@ -86,99 +74,32 @@ $ go build
 $ go install
 ```
 
-# Usage
+## Usage
 
-Run without arguments or with <code>--help</code> switch to show the helptext:
+    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable '/path/to/your/app argument --flag'
 
-    $ rabbitmq-cli-consumer
-    NAME:
-       rabbitmq-cli-consumer - Consume RabbitMQ easily to any cli program
+Run without arguments or with `-help` switch to show the helptext:
 
-    USAGE:
-       rabbitmq-cli-consumer [global options] command [command options] [arguments...]
+### Configuration
 
-    VERSION:
-       0.0.1
+The file `example.com` contains all available configuration options together
+with its explanation.
 
-    AUTHOR:
-      Richard van den Brand - <richard@vandenbrand.org>
+In Go the zero value for a string is `""`. So, any values not configured in the
+config file will result in a empty string. Now imagine you want to define an
+empty name for one of the configuration settings. Yes, we now cannot determine
+whether this value was empty on purpose or just left out. If you want to
+configure an empty string you have to be explicit by using the value `<empty>`.
 
-    COMMANDS:
-       help, h	Shows a list of commands or help for one command
-
-    GLOBAL OPTIONS:
-       --executable, -e 	Location of executable
-       --configuration, -c 	Location of configuration file
-       --verbose, -V	Enable verbose mode (logs to stdout and stderr)
-       --include, -i	Include metadata. Passes message as JSON data including headers, properties and message body.
-       --help, -h		show help
-       --version, -v	print the version
-
-## Configuration
-
-A configuration file is required. Example:
-
-```ini
-[rabbitmq]
-host = localhost
-username = username-of-rabbitmq-user
-password = secret
-vhost=/your-vhost
-port=5672
-queue=name-of-queue
-compression=Off
-
-[logs]
-error = /location/to/error.log
-info = /location/to/info.log
-```
-
-When you've created the configuration you can start the consumer like this:
-
-    $ rabbitmq-cli-consumer -e "/path/to/your/app argument --flag" -c /path/to/your/configuration.conf -V
-
-Run without <code>-V</code> to get rid of the output:
-
-    $ rabbitmq-cli-consumer -e "/path/to/your/app argument --flag" -c /path/to/your/configuration.conf
-
-### Prefetch count
-
-It's possible to configure the prefetch count and if you want set it as global. Add the following section to your
-configuration to confol these values:
-
-```ini
-[prefetch]
-count=3
-global=Off
-```
-
-### Configuring the exchange
-
-It's also possible to configure the exchange and its options. When left out in the configuration file, the default
-exchange will be used. To configure the exchange add the following to your configuration file:
-
-```ini
-[exchange]
-name=mail
-autodelete=Off
-type=direct
-durable=On
-```
-
-### How to configure an empty string value
-
-In Go the zero value for a string is `""`. So, any values not configured in the config file will result in a
-empty string. Now imagine you want to define an empty name for one of the configuration settings. Yes, we now
-cannot determine whether this value was empty on purpose or just left out. If you want to configure an empty string
-you have to be explicit by using the value `<empty>`.
+   rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php --configuration example.conf
 
 ## The executable
 
 Your executable receives the message as the last argument. So consider the following:
 
-   $ rabbitmq-cli-consumer -e "/home/vagrant/current/app/command.php" -c example.conf -V
+   rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php
 
-The <code>command.php</code> file should look like this:
+The `command.php` file should look like this:
 
 ```php
 #!/usr/bin/env php
@@ -202,7 +123,7 @@ exit(1);
 
 Or a Symfony2 example:
 
-    $ rabbitmq-cli-consumer -e "/path/to/symfony/app/console event:processing -e=prod" -c example.conf -V
+    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable 'app/console event:processing --env=prod'
 
 Command looks like this:
 
@@ -238,30 +159,23 @@ class TestCommand extends ContainerAwareCommand
 }
 ```
 
-## Compression
+### Compression
 
-Depending on what you're passing around on the queue, it may be wise to enable compression support. If you don't you may
-encouter the infamous "Argument list too long" error.
+Depending on what you're passing around on the queue, it may be wise to enable
+compression support. If you don't you may encouter the infamous "Argument list
+too long" error.
 
-When compression is enabled, the message gets compressed with zlib maximum compression before it's base64 encoded. We
-have to pay a performance penalty for this. If you are serializing large php objects I suggest to turn it on. Better
-safe then sorry.
+When compression is enabled, the message gets compressed with zlib maximum
+compression before it's base64 encoded. We have to pay a performance penalty
+for this. If you are serializing large php objects I suggest to turn it on.
+Better safe then sorry.
 
 In your config:
 
 ```ini
 [rabbitmq]
-host = localhost
-username = username-of-rabbitmq-user
-password = secret
-vhost=/your-vhost
-port=5672
-queue=name-of-queue
-compression=On
+compression = On
 
-[logs]
-error = /location/to/error.log
-info = /location/to/info.log
 ```
 
 And in your php app:
@@ -292,13 +206,13 @@ exit(1);
 
 ```
 
-## Including properties and message headers
+### Including properties and message headers
 
 
-If you need to access message headers or properties, call the command with the
-`--include, -i` option set.
+If you need to access message headers and or properties, call the command with
+the `--include` option set.
 
-    $ rabbitmq-cli-consumer -e "/home/vagrant/current/app/command.php" -c example.conf -i
+    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php --include
 
 The script then will receive a json encoded data structure which looks like
 the following.
@@ -356,8 +270,8 @@ if (do_heavy_lifting($data->body, $data->properties)) {
 exit(1);
 ```
 
-If you are using symfonies RabbitMQ bundle (`oldsound/rabbitmq-bundle`) you can
-wrap the consumer with the following symfony command.
+If you are using symfonies RabbitMQ bundle (`php-amqplib/rabbitmq-bundle`) you
+can wrap the consumer with the following symfony command.
 
 ```php
 <?php
@@ -396,11 +310,14 @@ class TestCommand extends ContainerAwareCommand
 }
 ```
 
-## Use pipes instead of arguments
+### Use pipes instead of arguments
 
-When starting the consymer with the `-pipes` option, the AMQP message will be
+When starting the consumer with the `--pipes` option, the AMQP message will be
 passed on to the executable using STDIN for the message body and fd3 for the
 metadata containing the properties and the delivery info encoded as JSON.
+
+    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php --pipe
+
 
 ```php
 #!/usr/bin/env php
@@ -430,11 +347,16 @@ if (false === $body) {
 
 ```
 
-# Strict exit code processing
+### Strict exit code processing
 
-By default, any non-zero exit code will make consumer send a negative acknowledgement and re-queue message back to the queue, in some cases it may cause your consumer to fall into an infinite loop as re-queued message will be getting back to consumer and it probably will fail again.
+By default, any non-zero exit code will make consumer send a negative
+acknowledgement and re-queue message back to the queue, in some cases it may
+cause your consumer to fall into an infinite loop as re-queued message will be
+getting back to consumer and it probably will fail again.
 
-It's possible to get better control over message acknowledgement by setting up strict exit code processing. In this mode consumer will acknowledge messages only if executable process return an allowed exit code.
+It's possible to get better control over message acknowledgement by setting up
+strict exit code processing. In this mode consumer will acknowledge messages
+only if executable process return an allowed exit code.
 
 **Allowed exit codes**
 
@@ -450,7 +372,7 @@ All other exit codes will cause consumer to fail.
 
 Run consumer with `--strict-exit-code` option to enable strict exit code processing:
 
-    $ rabbitmq-cli-consumer -e "/path/to/your/app argument --flag" -c /path/to/your/configuration.conf --strict-exit-code
+    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php --strict-exit-code
 
 Make sure your executable returns correct exit code
 
@@ -470,8 +392,15 @@ try {
 } catch(Exception $e) {
     exit(1); // Unexpected exception will cause consumer to stop consuming
 }
+
 ```
 
-# Developing
+## Contributing and license
 
-Missing anything? Found a bug? I love to see your PR.
+This library is licenced under [MIT](LICENSE.md). For information about how to
+contribute to this project, see [CONTRIBUTING.md].
+
+[12factor]: https://12factor.net
+[CONTRIBUTING.md]: https://github.com/corvus-ch/rabbitmq-cli-consumer/blob/master/CONTRIBUTING.md
+[die]: https://software-gunslinger.tumblr.com/post/47131406821/php-is-meant-to-die
+[ricbra]: https://github.com/ricbra
