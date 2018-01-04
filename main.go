@@ -194,24 +194,35 @@ func loggerFlags(noDateTime bool) int {
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
 func LoadConfiguration(c *cli.Context) (*config.Config, error) {
-	if c.String("configuration") == "" && c.String("executable") == "" {
+	file := c.String("configuration")
+	url := c.String("url")
+	queue := c.String("queue-name")
+
+	if file == "" && url == "" && queue == "" && c.String("executable") == "" {
 		cli.ShowAppHelp(c)
 		return nil, cli.NewExitError("", 1)
 	}
 
-	cfg, err := config.LoadAndParse(c.String("configuration"))
+	cfg, err := configuration(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing configuration: %s", err)
 	}
 
-	url := c.String("url")
 	if len(url) > 0 {
 		cfg.RabbitMq.AmqpUrl = url
 	}
 
-	if c.String("queue-name") != "" {
-		cfg.RabbitMq.Queue = c.String("queue-name")
+	if queue != "" {
+		cfg.RabbitMq.Queue = queue
 	}
 
 	return cfg, nil
+}
+
+func configuration(file string) (*config.Config, error) {
+	if file == "" {
+		return config.CreateFromString("")
+	}
+
+	return config.LoadAndParse(file)
 }

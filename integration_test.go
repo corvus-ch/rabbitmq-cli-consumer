@@ -97,6 +97,13 @@ var tests = []struct {
 		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
 	},
 	{
+		"envAmqpUrlNoConfig",
+		[]string{"-V", "-no-datetime", "-e", command, "-q", "test"},
+		"test",
+		amqp.Publishing{ContentType: "text/plain", Body: []byte("envAmqpUrlNoConfig")},
+		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
+	},
+	{
 		"pipe",
 		[]string{"-V", "-no-datetime", "-pipe", "-e", command + "-pipe", "-c", "fixtures/default.conf"},
 		"test",
