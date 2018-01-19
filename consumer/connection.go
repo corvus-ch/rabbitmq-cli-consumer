@@ -157,6 +157,10 @@ func (c *rabbitMqConnection) queueArgs() amqp.Table {
 		}
 	}
 
+	if c.cfg.HasPriority() {
+		args["x-max-priority"] = c.cfg.Priority()
+	}
+
 	if len(args) > 0 {
 		return args
 	}
