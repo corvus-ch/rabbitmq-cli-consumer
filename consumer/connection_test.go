@@ -14,15 +14,6 @@ import (
 
 const defaultConfig = `[rabbitmq]
   queue=defaultQueue
-
-  [queuesettings]
-  routingkey=defaultRouting
-
-  [exchange]
-  name=defaultExchange
-  autodelete=Off
-  type=test
-  durable=On
 `
 
 const qosConfig = `[rabbitmq]
@@ -38,6 +29,43 @@ const ttlConfig = `[rabbitmq]
 
   [queuesettings]
   messagettl=1200
+`
+
+const simpleExchangeConfig = `[rabbitmq]
+  queue = queueName
+
+  [exchange]
+  name = exchangeName
+  type = exchangeType
+`
+
+const durableExchangeConfig = `[rabbitmq]
+  queue = queueName
+
+  [exchange]
+  durable = On
+  name = exchangeName
+  type = exchangeType
+`
+
+const autodeleteEchangeConfig = `[rabbitmq]
+  queue = queueName
+
+  [exchange]
+  autodelete = On
+  name = exchangeName
+  type = exchangeType
+`
+
+const routingConfig = `[rabbitmq]
+  queue = routingQueue
+
+  [queuesettings]
+  routingkey = routingKey
+
+  [exchange]
+  name = routingExchange
+  type = routingType
 `
 
 const priorityConfig = `[rabbitmq]
@@ -90,15 +118,13 @@ var queueTests = []struct {
 	setup  func(*TestChannel)
 	err    error
 }{
-	// The happy path.
+	// Simple queue.
 	{
-		"happyPath",
+		"simpleQueue",
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "defaultQueue", "defaultRouting", "defaultExchange", false, amqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -190,26 +216,74 @@ var queueTests = []struct {
 		},
 		fmt.Errorf("failed to declare queue: queue error"),
 	},
+	// Declare exchange.
+	{
+		"declareExchange",
+		simpleExchangeConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Declare durable exchange.
+	{
+		"declareDurableExchange",
+		durableExchangeConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", true, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Declare auto delete exchange.
+	{
+		"declareAutoDeleteExchange",
+		autodeleteEchangeConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, true, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
 	// Declare exchange fails.
 	{
 		"declareExchangeFail",
-		defaultConfig,
+		simpleExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(fmt.Errorf("declare exchagne error")).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, amqp.Table{}).Return(fmt.Errorf("declare exchagne error")).Once()
 		},
 		fmt.Errorf("failed to declare exchange: declare exchagne error"),
+	},
+	// Bind queue.
+	{
+		"bindQueue",
+		routingConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "routingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, amqpTable).Return(nil).Once()
+		},
+		nil,
 	},
 	// Bind queue fails.
 	{
 		"bindQueueFail",
-		defaultConfig,
+		routingConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "defaultQueue", "defaultRouting", "defaultExchange", false, amqpTable).Return(fmt.Errorf("queue bind error")).Once()
+			ch.On("QueueDeclare", "routingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, amqpTable).Return(fmt.Errorf("queue bind error")).Once()
 		},
 		fmt.Errorf("failed to bind queue to exchange: queue bind error"),
 	},
