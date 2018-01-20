@@ -15,10 +15,6 @@ import (
 const defaultConfig = `[rabbitmq]
   queue=defaultQueue
 
-  [prefetch]
-  count=3
-  global=On
-
   [queuesettings]
   routingkey=defaultRouting
 
@@ -27,6 +23,14 @@ const defaultConfig = `[rabbitmq]
   autodelete=Off
   type=test
   durable=On
+`
+
+const qosConfig = `[rabbitmq]
+  queue = qosQueue
+
+  [prefetch]
+  count = 42
+  global = On
 `
 
 const ttlConfig = `[rabbitmq]
@@ -91,7 +95,7 @@ var queueTests = []struct {
 		"happyPath",
 		defaultConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
 			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
 			ch.On("QueueBind", "defaultQueue", "defaultRouting", "defaultExchange", false, amqpTable).Return(nil).Once()
@@ -157,12 +161,22 @@ var queueTests = []struct {
 		},
 		nil,
 	},
+	// Set QoS.
+	{
+		"setQos",
+		qosConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 42, 0, true).Return(nil).Once()
+			ch.On("QueueDeclare", "qosQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
 	// Set QoS fails.
 	{
 		"setQosFail",
-		defaultConfig,
+		qosConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(fmt.Errorf("QoS error")).Once()
+			ch.On("Qos", 42, 0, true).Return(fmt.Errorf("QoS error")).Once()
 		},
 		fmt.Errorf("failed to set QoS: QoS error"),
 	},
@@ -171,7 +185,7 @@ var queueTests = []struct {
 		"declareQueueFail",
 		defaultConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, fmt.Errorf("queue error")).Once()
 		},
 		fmt.Errorf("failed to declare queue: queue error"),
@@ -181,7 +195,7 @@ var queueTests = []struct {
 		"declareExchangeFail",
 		defaultConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
 			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(fmt.Errorf("declare exchagne error")).Once()
 		},
@@ -192,7 +206,7 @@ var queueTests = []struct {
 		"bindQueueFail",
 		defaultConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
 			ch.On("ExchangeDeclare", "defaultExchange", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
 			ch.On("QueueBind", "defaultQueue", "defaultRouting", "defaultExchange", false, amqpTable).Return(fmt.Errorf("queue bind error")).Once()
