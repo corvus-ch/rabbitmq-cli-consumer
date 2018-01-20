@@ -13,11 +13,6 @@ import (
 )
 
 const defaultConfig = `[rabbitmq]
-  host=localhost
-  username=ricbra
-  password=t3st
-  vhost=staging
-  port=123
   queue=worker
 
   [prefetch]
@@ -32,36 +27,14 @@ const defaultConfig = `[rabbitmq]
   autodelete=Off
   type=test
   durable=On
-
-  [logs]
-  error=a
-  info=b`
+`
 
 const ttlConfig = `[rabbitmq]
-  host=localhost
-  username=ricbra
-  password=t3st
-  vhost=staging
-  port=123
   queue=worker
 
-  [prefetch]
-  count=3
-  global=On
-
   [queuesettings]
-  routingkey=foo
   messagettl=1200
-
-  [exchange]
-  name=worker
-  autodelete=Off
-  type=test
-  durable=On
-
-  [logs]
-  error=a
-  info=b`
+`
 
 const priorityConfig = `[rabbitmq]
   queue=worker
@@ -126,10 +99,8 @@ var queueTests = []struct {
 		"queueWithTTL",
 		ttlConfig,
 		func(ch *TestChannel) {
-			ch.On("Qos", 3, 0, true).Return(nil).Once()
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "worker", true, false, false, false, amqp.Table{"x-message-ttl": int32(1200)}).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "worker", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "worker", "foo", "worker", false, amqpTable).Return(nil).Once()
 		},
 		nil,
 	},
