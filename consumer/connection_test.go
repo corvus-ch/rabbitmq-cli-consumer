@@ -63,6 +63,16 @@ const ttlConfig = `[rabbitmq]
   error=a
   info=b`
 
+const priorityConfig = `[rabbitmq]
+  queue=worker
+
+  [queuesettings]
+  priority=42
+
+  [exchange]
+  name=worker
+  type=test`
+
 var amqpTable amqp.Table
 
 var queueTests = []struct {
@@ -92,6 +102,18 @@ var queueTests = []struct {
 			ch.On("QueueDeclare", "worker", true, false, false, false, amqp.Table{"x-message-ttl": int32(1200)}).Return(amqp.Queue{}, nil).Once()
 			ch.On("ExchangeDeclare", "worker", "test", true, false, false, false, amqp.Table{}).Return(nil).Once()
 			ch.On("QueueBind", "worker", "foo", "worker", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Define queue with Priority.
+	{
+		"queueWithPriority",
+		priorityConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "worker", true, false, false, false, amqp.Table{"x-max-priority": int32(42)}).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "worker", "test", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "worker", "", "worker", false, amqpTable).Return(nil).Once()
 		},
 		nil,
 	},

@@ -29,6 +29,7 @@ type Config struct {
 		MessageTTL           int
 		DeadLetterExchange   string
 		DeadLetterRoutingKey string
+		Priority             int
 	}
 	Exchange struct {
 		Name       string
@@ -134,6 +135,16 @@ func (c Config) HasDeadLetterRouting() bool {
 // DeadLetterRoutingKey returns the configured key for the dead letter routing.
 func (c Config) DeadLetterRoutingKey() string {
 	return transformToStringValue(c.QueueSettings.DeadLetterRoutingKey)
+}
+
+// HasPriority checks if priority is configured
+func (c Config) HasPriority() bool {
+	return c.QueueSettings.Priority > 0
+}
+
+// Priority returns the priority
+func (c Config) Priority() int32 {
+	return int32(c.QueueSettings.Priority)
 }
 
 func LoadAndParse(location string) (*Config, error) {
