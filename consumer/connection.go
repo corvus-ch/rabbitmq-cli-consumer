@@ -128,14 +128,16 @@ func (c *rabbitMqConnection) declareExchange() error {
 
 	// Bind queue
 	c.outLog.Printf("Binding queue \"%s\" to exchange \"%s\"...", c.cfg.RabbitMq.Queue, c.cfg.Exchange.Name)
-	if err := c.ch.QueueBind(
-		c.cfg.RabbitMq.Queue,
-		c.cfg.RoutingKey(),
-		c.cfg.ExchangeName(),
-		false,
-		nil,
-	); err != nil {
-		return fmt.Errorf("failed to bind queue to exchange: %v", err)
+	for _, routingKey := range c.cfg.RoutingKeys() {
+		if err := c.ch.QueueBind(
+			c.cfg.RabbitMq.Queue,
+			routingKey,
+			c.cfg.ExchangeName(),
+			false,
+			nil,
+		); err != nil {
+			return fmt.Errorf("failed to bind queue to exchange: %v", err)
+		}
 	}
 
 	return nil

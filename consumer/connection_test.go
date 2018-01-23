@@ -73,6 +73,34 @@ const priorityConfig = `[rabbitmq]
   name=worker
   type=test`
 
+const multipleRoutingKeysConfig = `[rabbitmq]
+  queue=worker
+
+  [queuesettings]
+  routingkey=foo
+  routingkey=bar
+
+  [exchange]
+  name=worker
+  type=test`
+
+const oneEmptyRoutingKeyConfig = `[rabbitmq]
+  queue=worker
+
+  [queuesettings]
+  routingkey="<empty>"
+
+  [exchange]
+  name=worker
+  type=test`
+
+const noRoutingKeyConfig = `[rabbitmq]
+  queue=worker
+
+  [exchange]
+  name=worker
+  type=test`
+
 var amqpTable amqp.Table
 
 var queueTests = []struct {
@@ -112,6 +140,43 @@ var queueTests = []struct {
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "worker", true, false, false, false, amqp.Table{"x-max-priority": int32(42)}).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "worker", "test", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "worker", "", "worker", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Define queue with multiple routing keys.
+	{
+		"queueWithMultipleRoutingKeys",
+		multipleRoutingKeysConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "worker", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "worker", "test", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "worker", "foo", "worker", false, amqpTable).Return(nil).Once()
+			ch.On("QueueBind", "worker", "bar", "worker", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Define queue with one emtpy routing key.
+	{
+		"queueWithOneEmptyRoutingKey",
+		oneEmptyRoutingKeyConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "worker", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "worker", "test", false, false, false, false, amqp.Table{}).Return(nil).Once()
+			ch.On("QueueBind", "worker", "", "worker", false, amqpTable).Return(nil).Once()
+		},
+		nil,
+	},
+	// Define queue without routing key.
+	{
+		"queueWithoutRoutingKey",
+		noRoutingKeyConfig,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "worker", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
 			ch.On("ExchangeDeclare", "worker", "test", false, false, false, false, amqp.Table{}).Return(nil).Once()
 			ch.On("QueueBind", "worker", "", "worker", false, amqpTable).Return(nil).Once()
 		},

@@ -25,7 +25,7 @@ type Config struct {
 		Global bool
 	}
 	QueueSettings struct {
-		Routingkey           string
+		Routingkey           []string
 		MessageTTL           int
 		DeadLetterExchange   string
 		DeadLetterRoutingKey string
@@ -112,9 +112,13 @@ func (c Config) MessageTTL() int32 {
 	return int32(c.QueueSettings.MessageTTL)
 }
 
-// RoutingKey returns the configured key for message routing.
-func (c Config) RoutingKey() string {
-	return transformToStringValue(c.QueueSettings.Routingkey)
+// RoutingKeys returns the configured keys for message routing.
+func (c Config) RoutingKeys() []string {
+	if len(c.QueueSettings.Routingkey) < 1 {
+		return []string{""}
+	}
+
+	return transformArrayOfStringToStringValue(c.QueueSettings.Routingkey)
 }
 
 // HasDeadLetterExchange checks if a dead letter exchange is configured.
@@ -181,4 +185,14 @@ func transformToStringValue(val string) string {
 	}
 
 	return val
+}
+
+func transformArrayOfStringToStringValue(iterable []string) []string {
+	var ret []string
+
+	for _, str := range iterable {
+		ret = append(ret, transformToStringValue(str))
+	}
+
+	return ret
 }
