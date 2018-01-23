@@ -12,103 +12,19 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const defaultConfig = `[rabbitmq]
-  queue=defaultQueue
-`
-
-const qosConfig = `[rabbitmq]
-  queue = qosQueue
-
-  [prefetch]
-  count = 42
-  global = On
-`
-
-const ttlConfig = `[rabbitmq]
-  queue = ttlQueue
-
-  [queuesettings]
-  messagettl=1200
-`
-
-const simpleExchangeConfig = `[rabbitmq]
-  queue = queueName
-
-  [exchange]
-  name = exchangeName
-  type = exchangeType
-`
-
-const durableExchangeConfig = `[rabbitmq]
-  queue = queueName
-
-  [exchange]
-  durable = On
-  name = exchangeName
-  type = exchangeType
-`
-
-const autodeleteEchangeConfig = `[rabbitmq]
-  queue = queueName
-
-  [exchange]
-  autodelete = On
-  name = exchangeName
-  type = exchangeType
-`
-
-const routingConfig = `[rabbitmq]
-  queue = routingQueue
-
-  [queuesettings]
-  routingkey = routingKey
-
-  [exchange]
-  name = routingExchange
-  type = routingType
-`
-
-const priorityConfig = `[rabbitmq]
-  queue = priorityWorker
-
-  [queuesettings]
-  priority=42
-
-  [exchange]
-  name = priorityExchange
-  type = priorityType
-`
-
-const multipleRoutingKeysConfig = `[rabbitmq]
-  queue = multiRoutingQueue
-
-  [queuesettings]
-  routingkey=foo
-  routingkey=bar
-
-  [exchange]
-  name = multiRoutingExchange
-  type = multiRoutingType
-`
-
-const oneEmptyRoutingKeyConfig = `[rabbitmq]
-  queue = emptyRoutingQueue
-
-  [queuesettings]
-  routingkey="<empty>"
-
-  [exchange]
-  name = emptyRoutingExchange
-  type = emptyRoutingType
-`
-
-const noRoutingKeyConfig = `[rabbitmq]
-  queue = noRoutingQueue
-
-  [exchange]
-  name = noRoutingExchange
-  type = noRoutingType
-`
+const (
+	autodeleteExchangeConfig  = "autodelete"
+	defaultConfig             = "default"
+	durableExchangeConfig     = "durable"
+	multipleRoutingKeysConfig = "multiple_routing"
+	noRoutingKeyConfig        = "no_routing"
+	oneEmptyRoutingKeyConfig  = "empty_routing"
+	priorityConfig            = "priority"
+	qosConfig                 = "qos"
+	routingConfig             = "routing"
+	simpleExchangeConfig      = "exchange"
+	ttlConfig                 = "ttl"
+)
 
 var amqpTable amqp.Table
 
@@ -243,7 +159,7 @@ var queueTests = []struct {
 	// Declare auto delete exchange.
 	{
 		"declareAutoDeleteExchange",
-		autodeleteEchangeConfig,
+		autodeleteExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
@@ -292,7 +208,7 @@ var queueTests = []struct {
 func TestQueueSettings(t *testing.T) {
 	for _, test := range queueTests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg, _ := config.CreateFromString(test.config)
+			cfg, _ := config.LoadAndParse(fmt.Sprintf("fixtures/%s.conf", test.config))
 
 			var b bytes.Buffer
 			infLogger := log.New(&b, "", 0)
