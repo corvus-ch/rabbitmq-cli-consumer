@@ -26,7 +26,8 @@ const (
 	ttlConfig                 = "ttl"
 )
 
-var amqpTable amqp.Table
+var nilAmqpTable amqp.Table
+var emptyAmqpTable = amqp.Table{}
 
 var queueTests = []struct {
 	name   string
@@ -40,7 +41,7 @@ var queueTests = []struct {
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
 		},
 		nil,
 	},
@@ -61,8 +62,8 @@ var queueTests = []struct {
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
 			ch.On("QueueDeclare", "priorityWorker", true, false, false, false, amqp.Table{"x-max-priority": int32(42)}).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "priorityExchange", "priorityType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "priorityWorker", "", "priorityExchange", false, amqpTable).Return(nil).Once()
+			ch.On("ExchangeDeclare", "priorityExchange", "priorityType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "priorityWorker", "", "priorityExchange", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -72,10 +73,10 @@ var queueTests = []struct {
 		multipleRoutingKeysConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "multiRoutingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "multiRoutingExchange", "multiRoutingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "multiRoutingQueue", "foo", "multiRoutingExchange", false, amqpTable).Return(nil).Once()
-			ch.On("QueueBind", "multiRoutingQueue", "bar", "multiRoutingExchange", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "multiRoutingQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "multiRoutingExchange", "multiRoutingType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "multiRoutingQueue", "foo", "multiRoutingExchange", false, nilAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "multiRoutingQueue", "bar", "multiRoutingExchange", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -85,9 +86,9 @@ var queueTests = []struct {
 		oneEmptyRoutingKeyConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "emptyRoutingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "emptyRoutingExchange", "emptyRoutingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "emptyRoutingQueue", "", "emptyRoutingExchange", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "emptyRoutingQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "emptyRoutingExchange", "emptyRoutingType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "emptyRoutingQueue", "", "emptyRoutingExchange", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -97,9 +98,9 @@ var queueTests = []struct {
 		noRoutingKeyConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "noRoutingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "noRoutingExchange", "noRoutingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "noRoutingQueue", "", "noRoutingExchange", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "noRoutingQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "noRoutingExchange", "noRoutingType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "noRoutingQueue", "", "noRoutingExchange", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -109,7 +110,7 @@ var queueTests = []struct {
 		qosConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 42, 0, true).Return(nil).Once()
-			ch.On("QueueDeclare", "qosQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("QueueDeclare", "qosQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
 		},
 		nil,
 	},
@@ -128,7 +129,7 @@ var queueTests = []struct {
 		defaultConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, fmt.Errorf("queue error")).Once()
+			ch.On("QueueDeclare", "defaultQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, fmt.Errorf("queue error")).Once()
 		},
 		fmt.Errorf("failed to declare queue: queue error"),
 	},
@@ -138,9 +139,9 @@ var queueTests = []struct {
 		simpleExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -150,9 +151,9 @@ var queueTests = []struct {
 		durableExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", true, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", true, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -162,9 +163,9 @@ var queueTests = []struct {
 		autodeleteExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, true, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "queueName", "", "exchangeName", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, true, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "queueName", "", "exchangeName", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -174,8 +175,8 @@ var queueTests = []struct {
 		simpleExchangeConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "queueName", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, amqp.Table{}).Return(fmt.Errorf("declare exchagne error")).Once()
+			ch.On("QueueDeclare", "queueName", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "exchangeName", "exchangeType", false, false, false, false, emptyAmqpTable).Return(fmt.Errorf("declare exchagne error")).Once()
 		},
 		fmt.Errorf("failed to declare exchange: declare exchagne error"),
 	},
@@ -185,9 +186,9 @@ var queueTests = []struct {
 		routingConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "routingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, amqpTable).Return(nil).Once()
+			ch.On("QueueDeclare", "routingQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, nilAmqpTable).Return(nil).Once()
 		},
 		nil,
 	},
@@ -197,9 +198,9 @@ var queueTests = []struct {
 		routingConfig,
 		func(ch *TestChannel) {
 			ch.On("Qos", 3, 0, false).Return(nil).Once()
-			ch.On("QueueDeclare", "routingQueue", true, false, false, false, amqpTable).Return(amqp.Queue{}, nil).Once()
-			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, amqp.Table{}).Return(nil).Once()
-			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, amqpTable).Return(fmt.Errorf("queue bind error")).Once()
+			ch.On("QueueDeclare", "routingQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+			ch.On("ExchangeDeclare", "routingExchange", "routingType", false, false, false, false, emptyAmqpTable).Return(nil).Once()
+			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, nilAmqpTable).Return(fmt.Errorf("queue bind error")).Once()
 		},
 		fmt.Errorf("failed to bind queue to exchange: queue bind error"),
 	},
