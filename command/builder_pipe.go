@@ -5,18 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/thockin/logr"
 )
 
 type PipeBuilder struct {
 	Builder
-	outLogger    *log.Logger
-	errLogger    *log.Logger
+	log          logr.Logger
 	outputWriter io.Writer
 	errorWriter  io.Writer
 	cmd          string
@@ -24,12 +23,9 @@ type PipeBuilder struct {
 	capture      bool
 }
 
-func (b *PipeBuilder) SetOutputLogger(l *log.Logger) {
-	b.outLogger = l
-}
-
-func (b *PipeBuilder) SetErrorLogger(l *log.Logger) {
-	b.errLogger = l
+// SetLogger is part of Builder.
+func (b *PipeBuilder) SetLogger(l logr.Logger) {
+	b.log = l
 }
 
 func (b *PipeBuilder) SetOutputWriter(w io.Writer) {
@@ -88,5 +84,5 @@ func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo,
 	w.Write(meta)
 	w.Close()
 
-	return NewExecCommand(cmd, b.outLogger, b.errLogger), nil
+	return NewExecCommand(cmd, b.log), nil
 }

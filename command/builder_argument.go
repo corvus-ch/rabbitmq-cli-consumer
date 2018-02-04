@@ -7,20 +7,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/thockin/logr"
 )
 
 type ArgumentBuilder struct {
 	Builder
 	Compressed   bool
 	WithMetadata bool
-	outLogger    *log.Logger
-	errLogger    *log.Logger
+	log          logr.Logger
 	outputWriter io.Writer
 	errorWriter  io.Writer
 	cmd          string
@@ -28,12 +27,9 @@ type ArgumentBuilder struct {
 	capture      bool
 }
 
-func (b *ArgumentBuilder) SetOutputLogger(l *log.Logger) {
-	b.outLogger = l
-}
-
-func (b *ArgumentBuilder) SetErrorLogger(l *log.Logger) {
-	b.errLogger = l
+// SetLogger is part of Builder.
+func (b *ArgumentBuilder) SetLogger(l logr.Logger) {
+	b.log = l
 }
 
 func (b *ArgumentBuilder) SetOutputWriter(w io.Writer) {
@@ -91,7 +87,7 @@ func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryI
 		cmd.Stderr = b.errorWriter
 	}
 
-	return NewExecCommand(cmd, b.outLogger, b.errLogger), nil
+	return NewExecCommand(cmd, b.log), nil
 }
 
 func (b *ArgumentBuilder) payloadBuffer(payload []byte) (*bytes.Buffer, error) {
@@ -109,7 +105,7 @@ func (b *ArgumentBuilder) payloadBuffer(payload []byte) (*bytes.Buffer, error) {
 			return nil, fmt.Errorf("failed to create zlib handler: %v", err)
 		}
 		w = comp
-		b.outLogger.Println("Compressed message")
+		b.log.Info("Compressed message")
 	}
 	if _, err := w.Write(payload); err != nil {
 		return nil, fmt.Errorf("failed to write payload: %v", err)
