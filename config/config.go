@@ -38,8 +38,10 @@ type Config struct {
 		Durable    bool
 	}
 	Logs struct {
-		Error string
-		Info  string
+		Error      string
+		Info       string
+		NoDateTime bool
+		Verbose    bool
 	}
 }
 
@@ -151,6 +153,17 @@ func (c Config) Priority() int32 {
 	return int32(c.QueueSettings.Priority)
 }
 
+// IsVerbose checks if verbose logging is enabled.
+func (c Config) IsVerbose() bool {
+	return c.Logs.Verbose
+}
+
+// WithDateTime checks if log entries should be logged with date and time.
+func (c Config) WithDateTime() bool {
+	return !c.Logs.NoDateTime
+}
+
+// LoadAndParse creates a new instance of config by parsing the content of teh given file.
 func LoadAndParse(location string) (*Config, error) {
 	if !filepath.IsAbs(location) {
 		location, err := filepath.Abs(location)

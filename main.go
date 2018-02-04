@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log"
+	stdlog "log"
 	"os"
 
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 )
 
 var (
@@ -91,22 +91,22 @@ func Action(c *cli.Context) error {
 		return err
 	}
 
-	infLogger, errLogger, err := Loggers(c, cfg)
+	l, infW, errW, err := log.NewFromConfig(cfg)
 	if err != nil {
 		return err
 	}
 
 	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
-	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), infLogger, errLogger)
+	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), l, infW, errW)
 	if err != nil {
 		return fmt.Errorf("failed to create command builder: %v", err)
 	}
 
 	ack := consumer.NewAcknowledger(c.Bool("strict-exit-code"), cfg.RabbitMq.Onfailure)
 
-	client, err := consumer.New(cfg, builder, ack, errLogger, infLogger)
+	client, err := consumer.New(cfg, builder, ack, l)
 	if err != nil {
-		errLogger.Fatalf("Failed creating consumer: %s", err)
+		return cli.NewExitError(fmt.Sprintf("Failed creating consumer: %s", err), 1)
 	}
 
 	client.Consume()
@@ -123,7 +123,7 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	code := 1
 
 	if err.Error() != "" {
-		log.Printf("%+v\n", err)
+		stdlog.Printf("%+v\n", err)
 	}
 
 	if exitErr, ok := err.(cli.ExitCoder); ok {
@@ -145,51 +145,6 @@ func CreateBuilder(pipe, compression, metadata bool) command.Builder {
 		Compressed:   compression,
 		WithMetadata: metadata,
 	}
-}
-
-// Loggers creates the output and error loggers.
-func Loggers(c *cli.Context, cfg *config.Config) (*log.Logger, *log.Logger, error) {
-	verbose := c.Bool("verbose")
-	errLogger, err := CreateLogger(cfg.Logs.Error, verbose, os.Stderr, c.Bool("no-datetime"))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed creating error log: %s", err)
-	}
-
-	infLogger, err := CreateLogger(cfg.Logs.Info, verbose, os.Stdout, c.Bool("no-datetime"))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed creating info log: %s", err)
-	}
-
-	return infLogger, errLogger, nil
-}
-
-// CreateLogger creates a new logger instance which writes to the given file.
-// If verbose is set to true, in addition to the file, the logger will also write to writer passed as the out argument.
-func CreateLogger(filename string, verbose bool, out io.Writer, noDateTime bool) (*log.Logger, error) {
-	writers := make([]io.Writer, 0)
-	if len(filename) > 0 || !verbose {
-		file, err := os.OpenFile(filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
-
-		if err != nil {
-			return nil, err
-		}
-
-		writers = append(writers, file)
-	}
-
-	if verbose {
-		writers = append(writers, out)
-	}
-
-	return log.New(io.MultiWriter(writers...), "", loggerFlags(noDateTime)), nil
-}
-
-func loggerFlags(noDateTime bool) int {
-	if noDateTime {
-		return 0
-	}
-
-	return log.Ldate | log.Ltime
 }
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
@@ -214,6 +169,14 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if queue != "" {
 		cfg.RabbitMq.Queue = queue
+	}
+
+	if c.IsSet("no-datetime") {
+		cfg.Logs.NoDateTime = c.Bool("no-datetime")
+	}
+
+	if c.IsSet("verbose") {
+		cfg.Logs.Verbose = c.Bool("verbose")
 	}
 
 	return cfg, nil
