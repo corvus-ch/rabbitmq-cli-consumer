@@ -11,10 +11,20 @@ import (
 type Builder interface {
 	// SetLogger sets the logger passed to the command used while building.
 	SetLogger(l logr.Logger)
+
+	// SetOutputWriter sets the writer used for capturing the commands STDOUT when capturing is enabled.
 	SetOutputWriter(w io.Writer)
+
+	// SetErrorWriter sets the writer used for capturing the commands STDERR when capturing is enabled.
 	SetErrorWriter(lw io.Writer)
+
+	// SetCaptureOutput enables/disables output capturing of the command.
 	SetCaptureOutput(captrue bool)
+
+	// SetCommand sets the command to be executed for each received message.
 	SetCommand(cmd string)
+
+	// GetCommand gets the executable command for the given message data.
 	GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error)
 }
 
