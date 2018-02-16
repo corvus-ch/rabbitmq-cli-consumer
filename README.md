@@ -58,7 +58,7 @@ $ go get github.com/ricbra/rabbitmq-cli-consumer
 Change to the directory, e.g.:
 
 ```bash
-$ cd $GOPATH/src/github.com/ricbra/rabbitmq-cli-consumer
+$ cd $GOPATH/src/github.com/corvus-ch/rabbitmq-cli-consumer
 ```
 
 Get the dependencies:
