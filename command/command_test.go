@@ -1,13 +1,13 @@
 package command_test
 
 import (
-	"bytes"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"testing"
 
+	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/magiconair/properties/assert"
 	"github.com/sebdah/goldie"
@@ -38,13 +38,11 @@ var execCommandRunTests = []struct {
 func TestExecCommandRun(t *testing.T) {
 	for _, test := range execCommandRunTests {
 		t.Run(test.name, func(t *testing.T) {
-			outBuf := &bytes.Buffer{}
-			errBuf := &bytes.Buffer{}
-			execCmd := command.NewExecCommand(test.cmd, log.New(outBuf, "", 0), log.New(errBuf, "", 0))
+			l := log.New(0)
+			execCmd := command.NewExecCommand(test.cmd, l)
 
 			assert.Equal(t, execCmd.Run(), test.code)
-			goldie.Assert(t, t.Name()+"Stdout", outBuf.Bytes())
-			goldie.Assert(t, t.Name()+"Stderr", errBuf.Bytes())
+			goldie.Assert(t, t.Name(), l.Buf().Bytes())
 		})
 	}
 }
@@ -55,8 +53,8 @@ func fakeExecCommand(command string, capture bool, args ...string) *exec.Cmd {
 	cmd := exec.Command(os.Args[0], cs...)
 	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 	if capture {
-		cmd.Stdout = &bytes.Buffer{}
-		cmd.Stderr = &bytes.Buffer{}
+		cmd.Stdout = ioutil.Discard
+		cmd.Stderr = ioutil.Discard
 	}
 
 	return cmd

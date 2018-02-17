@@ -3,10 +3,10 @@ package consumer
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/streadway/amqp"
+	"github.com/thockin/logr"
 )
 
 // Connection describes the interface used by teh consumer to interact with the message queue.
@@ -25,35 +25,33 @@ type Connection interface {
 
 type rabbitMqConnection struct {
 	Connection
-	conn   *amqp.Connection
-	ch     Channel
-	cfg    *config.Config
-	outLog *log.Logger
-	errLog *log.Logger
+	conn *amqp.Connection
+	ch   Channel
+	cfg  *config.Config
+	log  logr.Logger
 }
 
 // NewConnection creates a new implementing instance of the connection interface.
-func NewConnection(cfg *config.Config, outLog, errLog *log.Logger) (Connection, error) {
-	outLog.Println("Connecting RabbitMQ...")
+func NewConnection(cfg *config.Config, l logr.Logger) (Connection, error) {
+	l.Info("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
 		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
 	}
-	outLog.Println("Connected.")
+	l.Info("Connected.")
 
-	outLog.Println("Opening channel...")
+	l.Info("Opening channel...")
 	ch, err := conn.Channel()
 	if nil != err {
 		return nil, fmt.Errorf("failed to open a channel: %v", err)
 	}
-	outLog.Println("Done.")
+	l.Info("Done.")
 
 	return &rabbitMqConnection{
-		conn:   conn,
-		ch:     ch,
-		cfg:    cfg,
-		outLog: outLog,
-		errLog: errLog,
+		conn: conn,
+		ch:   ch,
+		cfg:  cfg,
+		log:  l,
 	}, nil
 }
 
@@ -94,16 +92,16 @@ func (c *rabbitMqConnection) Close() error {
 }
 
 func (c *rabbitMqConnection) setupQoS() error {
-	c.outLog.Println("Setting QoS... ")
+	c.log.Info("Setting QoS... ")
 	if err := c.ch.Qos(c.cfg.PrefetchCount(), 0, c.cfg.Prefetch.Global); err != nil {
 		return fmt.Errorf("failed to set QoS: %v", err)
 	}
-	c.outLog.Println("Succeeded setting QoS.")
+	c.log.Info("Succeeded setting QoS.")
 	return nil
 }
 
 func (c *rabbitMqConnection) declareQueue() error {
-	c.outLog.Printf("Declaring queue \"%s\"...", c.cfg.RabbitMq.Queue)
+	c.log.Infof("Declaring queue \"%s\"...", c.cfg.RabbitMq.Queue)
 	_, err := c.ch.QueueDeclare(c.cfg.RabbitMq.Queue, true, false, false, false, c.queueArgs())
 	if nil != err {
 		return fmt.Errorf("failed to declare queue: %v", err)
@@ -113,7 +111,7 @@ func (c *rabbitMqConnection) declareQueue() error {
 }
 
 func (c *rabbitMqConnection) declareExchange() error {
-	c.outLog.Printf("Declaring exchange \"%s\"...", c.cfg.Exchange.Name)
+	c.log.Infof("Declaring exchange \"%s\"...", c.cfg.Exchange.Name)
 	if err := c.ch.ExchangeDeclare(
 		c.cfg.Exchange.Name,
 		c.cfg.ExchangeType(),
@@ -127,7 +125,7 @@ func (c *rabbitMqConnection) declareExchange() error {
 	}
 
 	// Bind queue
-	c.outLog.Printf("Binding queue \"%s\" to exchange \"%s\"...", c.cfg.RabbitMq.Queue, c.cfg.Exchange.Name)
+	c.log.Infof("Binding queue \"%s\" to exchange \"%s\"...", c.cfg.RabbitMq.Queue, c.cfg.Exchange.Name)
 	for _, routingKey := range c.cfg.RoutingKeys() {
 		if err := c.ch.QueueBind(
 			c.cfg.RabbitMq.Queue,

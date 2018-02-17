@@ -1,11 +1,10 @@
 package consumer
 
 import (
-	"bytes"
 	"fmt"
-	"log"
 	"testing"
 
+	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
@@ -211,19 +210,14 @@ func TestQueueSettings(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			cfg, _ := config.LoadAndParse(fmt.Sprintf("fixtures/%s.conf", test.config))
 
-			var b bytes.Buffer
-			infLogger := log.New(&b, "", 0)
-			errLogger := log.New(&b, "", 0)
-
 			ch := new(TestChannel)
 
 			test.setup(ch)
 
 			conn := &rabbitMqConnection{
-				cfg:    cfg,
-				ch:     ch,
-				outLog: infLogger,
-				errLog: errLogger,
+				cfg: cfg,
+				ch:  ch,
+				log: log.New(0),
 			}
 
 			assert.Equal(t, test.err, conn.Setup())

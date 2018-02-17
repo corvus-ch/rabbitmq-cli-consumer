@@ -63,7 +63,7 @@ var argumentBuilderGetCommandTests = []struct {
 func TestArgumentBuilder_GetCommand(t *testing.T) {
 	for _, test := range argumentBuilderGetCommandTests {
 		t.Run(test.name, func(t *testing.T) {
-			b, outLog, errLog := createAndAssertBuilder(t, &command.ArgumentBuilder{
+			b, ib, eb := createAndAssertBuilder(t, &command.ArgumentBuilder{
 				Compressed:   test.compressed,
 				WithMetadata: test.withMetadata,
 			}, test.name, test.capture)
@@ -72,8 +72,8 @@ func TestArgumentBuilder_GetCommand(t *testing.T) {
 			assert.Nil(t, cmd.Stdin)
 			assert.Nil(t, cmd.ExtraFiles)
 			assert.Equal(t, os.Environ(), cmd.Env)
-			assertLogger(t, outLog, cmd.Stdout, test.capture)
-			assertLogger(t, errLog, cmd.Stdout, test.capture)
+			assertWriter(t, ib, cmd.Stdout, test.capture)
+			assertWriter(t, eb, cmd.Stderr, test.capture)
 		})
 	}
 }

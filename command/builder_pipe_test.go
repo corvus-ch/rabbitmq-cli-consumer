@@ -33,7 +33,7 @@ var pipeBuilderGetCommandtests = []struct {
 func TestPipeBuilder_GetCommand(t *testing.T) {
 	for _, test := range pipeBuilderGetCommandtests {
 		t.Run(test.name, func(t *testing.T) {
-			b, outLog, errLog := createAndAssertBuilder(t, &command.PipeBuilder{}, test.name, test.capture)
+			b, ib, eb := createAndAssertBuilder(t, &command.PipeBuilder{}, test.name, test.capture)
 			cmd := createAndAssertCommand(t, b, []byte(test.name))
 			assert.Equal(t, strings.Split(test.name, " "), cmd.Args)
 			assert.NotNil(t, cmd.Stdin)
@@ -43,8 +43,8 @@ func TestPipeBuilder_GetCommand(t *testing.T) {
 			metadata, _ := ioutil.ReadAll(cmd.ExtraFiles[0])
 			assert.Equal(t, emptyPropertiesString, string(metadata))
 			assert.Equal(t, os.Environ(), cmd.Env)
-			assertLogger(t, outLog, cmd.Stdout, test.capture)
-			assertLogger(t, errLog, cmd.Stdout, test.capture)
+			assertWriter(t, ib, cmd.Stdout, test.capture)
+			assertWriter(t, eb, cmd.Stderr, test.capture)
 		})
 	}
 }
