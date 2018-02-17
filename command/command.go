@@ -1,9 +1,10 @@
 package command
 
 import (
-	"log"
 	"os/exec"
 	"syscall"
+
+	"github.com/thockin/logr"
 )
 
 type Command interface {
@@ -13,16 +14,14 @@ type Command interface {
 
 type ExecCommand struct {
 	Command
-	cmd       *exec.Cmd
-	outLogger *log.Logger
-	errLogger *log.Logger
+	cmd *exec.Cmd
+	log logr.Logger
 }
 
-func NewExecCommand(cmd *exec.Cmd, outLog, errLog *log.Logger) Command {
+func NewExecCommand(cmd *exec.Cmd, l logr.Logger) Command {
 	return &ExecCommand{
-		cmd:       cmd,
-		outLogger: outLog,
-		errLogger: errLog,
+		cmd: cmd,
+		log: l,
 	}
 }
 
@@ -33,22 +32,25 @@ func (ec ExecCommand) Cmd() *exec.Cmd {
 func (c ExecCommand) Run() int {
 	var err error
 
-	c.outLogger.Println("Processing message...")
-	defer c.outLogger.Println("Processed!")
+	c.log.Info("Processing message...")
+	defer c.log.Info("Processed!")
 
-	if c.cmd.Stdout == nil && c.cmd.Stderr == nil {
-		var out []byte
+	capture := c.cmd.Stdout == nil && c.cmd.Stderr == nil
+
+	var out []byte
+
+	if capture {
 		out, err = c.cmd.CombinedOutput()
-		if err != nil {
-			c.errLogger.Printf("Failed: %s\n", string(out))
-		}
 	} else {
 		err = c.cmd.Run()
 	}
 
 	if err != nil {
-		c.outLogger.Println("Failed. Check error log for details.")
-		c.errLogger.Printf("Error: %s\n", err)
+		c.log.Info("Failed. Check error log for details.")
+		c.log.Errorf("Error: %s\n", err)
+		if capture {
+			c.log.Errorf("Failed: %s", string(out))
+		}
 
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {

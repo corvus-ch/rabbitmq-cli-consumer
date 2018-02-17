@@ -2,39 +2,39 @@ package consumer
 
 import (
 	"io"
-	"log"
 	"os"
 
+	"fmt"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
 	"github.com/streadway/amqp"
+	"github.com/thockin/logr"
 )
 
 type Consumer struct {
 	Connection   Connection
 	Builder      command.Builder
 	Acknowledger Acknowledger
-	ErrLogger    *log.Logger
-	InfLogger    *log.Logger
+	Log          logr.Logger
 }
 
 // ConnectionCloseHandler calls os.Exit after the connection to RabbitMQ got closed.
 func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 	err := <-closeErr
-	c.ErrLogger.Fatalf("Connection closed: %v", err)
+	c.Log.Error("Connection closed: %v", err)
 	os.Exit(10)
 }
 
 // Consume subscribes itself to the message queue and starts consuming messages.
-func (c *Consumer) Consume() {
-	c.InfLogger.Println("Registering consumer... ")
+func (c *Consumer) Consume() error {
+	c.Log.Info("Registering consumer... ")
 	msgs, err := c.Connection.Consume()
 	if err != nil {
-		c.ErrLogger.Fatalf("Failed to register a consumer: %s", err)
+		return fmt.Errorf("failed to register a consumer: %s", err)
 	}
 
-	c.InfLogger.Println("Succeeded registering consumer.")
+	c.Log.Info("Succeeded registering consumer.")
 
 	defer c.Connection.Close()
 
@@ -51,15 +51,17 @@ func (c *Consumer) Consume() {
 		}
 	}()
 
-	c.InfLogger.Println("Waiting for messages...")
+	c.Log.Info("Waiting for messages...")
 	<-forever
+
+	return nil
 }
 
 // ProcessMessage processes a single message by running the executable.
 func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.DeliveryInfo) {
 	cmd, err := c.Builder.GetCommand(p, m, d.Body())
 	if err != nil {
-		c.ErrLogger.Printf("failed to create command: %v", err)
+		c.Log.Errorf("failed to create command: %v", err)
 		d.Nack(true, true)
 		return
 	}
@@ -67,14 +69,14 @@ func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.
 	exitCode := cmd.Run()
 
 	if err := c.Acknowledger.Ack(d, exitCode); err != nil {
-		c.ErrLogger.Printf("Message acknowledgement error: %v", err)
+		c.Log.Errorf("Message acknowledgement error: %v", err)
 		os.Exit(11)
 	}
 }
 
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogger, infLogger *log.Logger) (*Consumer, error) {
-	conn, err := NewConnection(cfg, infLogger, errLogger)
+func New(cfg *config.Config, builder command.Builder, ack Acknowledger, l logr.Logger) (*Consumer, error) {
+	conn, err := NewConnection(cfg, l)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +89,7 @@ func New(cfg *config.Config, builder command.Builder, ack Acknowledger, errLogge
 		Connection:   conn,
 		Builder:      builder,
 		Acknowledger: ack,
-		ErrLogger:    errLogger,
-		InfLogger:    infLogger,
+		Log:          l,
 	}, nil
 }
 
