@@ -113,7 +113,7 @@ var tests = []struct {
 }
 
 func TestEndToEnd(t *testing.T) {
-	conn := prepare()
+	conn := prepare(t)
 	defer conn.Close()
 
 	ch, err := conn.Channel()
@@ -138,29 +138,25 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
-func prepare() *amqp.Connection {
+func prepare(t *testing.T) *amqp.Connection {
 	makeCmd := exec.Command("make", "build")
 	if err := makeCmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "could not build binary for: %v\n", err)
-		os.Exit(1)
+		t.Fatalf("could not build binary for: %v", err)
 	}
 
 	stopCmd := exec.Command("docker-compose", "down", "--volumes", "--remove-orphans")
 	if err := stopCmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to stop docker stack: %v\n", err)
-		os.Exit(1)
+		t.Fatalf("failed to stop docker stack: %v", err)
 	}
 
 	upCmd := exec.Command("docker-compose", "up", "-d")
 	if err := upCmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start docker stack: %v\n", err)
-		os.Exit(1)
+		t.Fatalf("failed to start docker stack: %v", err)
 	}
 
 	conn, err := connect("amqp://guest:guest@localhost:5672/")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open AMQP connection: %v", err)
-		os.Exit(1)
+		t.Fatalf("failed to open AMQP connection: %v", err)
 	}
 
 	return conn
