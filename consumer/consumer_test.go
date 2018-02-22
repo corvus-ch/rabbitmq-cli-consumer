@@ -21,8 +21,7 @@ var consumeTests = []struct {
 	{
 		"happy path",
 		func(t *testing.T, ch *TestChannel, p *TestProcessor, msgs chan amqp.Delivery, d amqp.Delivery) error {
-			ch.On("Consume", t.Name(), "", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
-			ch.On("NotifyClose", mock.Anything)
+			ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 			p.On("Process", delivery.New(d)).Once().Return(nil)
 			return nil
 		},
@@ -31,7 +30,7 @@ var consumeTests = []struct {
 	{
 		"consume error",
 		func(t *testing.T, ch *TestChannel, p *TestProcessor, msgs chan amqp.Delivery, d amqp.Delivery) error {
-			ch.On("Consume", t.Name(), "", false, false, false, false, nilAmqpTable).
+			ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(nil, fmt.Errorf("consume error"))
 			return fmt.Errorf("failed to register a consumer: consume error")
@@ -42,8 +41,7 @@ var consumeTests = []struct {
 		"process error",
 		func(t *testing.T, ch *TestChannel, p *TestProcessor, msgs chan amqp.Delivery, d amqp.Delivery) error {
 			err := fmt.Errorf("process error")
-			ch.On("Consume", t.Name(), "", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
-			ch.On("NotifyClose", mock.Anything)
+			ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 			p.On("Process", delivery.New(d)).Once().Return(err)
 			return err
 		},
@@ -53,8 +51,7 @@ var consumeTests = []struct {
 		"create command error",
 		func(t *testing.T, ch *TestChannel, p *TestProcessor, msgs chan amqp.Delivery, d amqp.Delivery) error {
 			err := processor.NewCreateCommandError(fmt.Errorf("create command error"))
-			ch.On("Consume", t.Name(), "", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
-			ch.On("NotifyClose", mock.Anything)
+			ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 			p.On("Process", delivery.New(d)).Once().Return(err)
 			return nil
 		},
@@ -64,8 +61,7 @@ var consumeTests = []struct {
 		"ack error",
 		func(t *testing.T, ch *TestChannel, p *TestProcessor, msgs chan amqp.Delivery, d amqp.Delivery) error {
 			err := processor.NewAcknowledgmentError(fmt.Errorf("ack error"))
-			ch.On("Consume", t.Name(), "", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
-			ch.On("NotifyClose", mock.Anything)
+			ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 			p.On("Process", delivery.New(d)).Once().Return(err)
 			return err
 		},
@@ -85,7 +81,7 @@ func TestConsumer_Consume(t *testing.T) {
 			p := new(TestProcessor)
 			exp := test.setup(t, ch, p, msgs, d)
 			l := log.New(0)
-			c := consumer.New(conn, ch, t.Name(), l)
+			c := consumer.New(conn, ch, t.Name(), "ctag", l)
 			go func() {
 				err := c.Consume(p)
 				done <- err
@@ -101,4 +97,44 @@ func TestConsumer_Consume(t *testing.T) {
 			p.AssertExpectations(t)
 		})
 	}
+}
+
+func TestConsumer_Close(t *testing.T) {
+	t.Run("no connection", func(t *testing.T) {
+		c := consumer.New(nil, nil, "", "", log.New(0))
+		assert.Nil(t, c.Close())
+	})
+	t.Run("with connection", func(t *testing.T) {
+		conn := new(TestConnection)
+		conn.On("Close").Once().Return(nil)
+		c := consumer.New(conn, nil, "", "", log.New(0))
+		assert.Nil(t, c.Close())
+		conn.AssertExpectations(t)
+	})
+	t.Run("close error", func(t *testing.T) {
+		err := fmt.Errorf("close error")
+		conn := new(TestConnection)
+		conn.On("Close").Once().Return(err)
+		c := consumer.New(conn, nil, "", "", log.New(0))
+		assert.Equal(t, err, c.Close())
+		conn.AssertExpectations(t)
+	})
+}
+
+func TestConsumer_Cancel(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		ch := new(TestChannel)
+		ch.On("Cancel", t.Name(), false).Once().Return(nil)
+		c := consumer.New(nil, ch, "", t.Name(), log.New(0))
+		assert.Nil(t, c.Cancel())
+		ch.AssertExpectations(t)
+	})
+	t.Run("error", func(t *testing.T) {
+		err := fmt.Errorf("cancel error")
+		ch := new(TestChannel)
+		ch.On("Cancel", t.Name(), false).Once().Return(err)
+		c := consumer.New(nil, ch, "", t.Name(), log.New(0))
+		assert.Equal(t, err, c.Cancel())
+		ch.AssertExpectations(t)
+	})
 }

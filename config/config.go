@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"gopkg.in/gcfg.v1"
@@ -162,6 +163,19 @@ func (c Config) IsVerbose() bool {
 // WithDateTime checks if log entries should be logged with date and time.
 func (c Config) WithDateTime() bool {
 	return !c.Logs.NoDateTime
+}
+
+// ConsumerTag returns the tag used to identify the consumer.
+func (c Config) ConsumerTag() string {
+	if v, set := os.LookupEnv("GO_WANT_HELPER_PROCESS"); set && v == "1" {
+		return ""
+	}
+
+	host, err := os.Hostname()
+	if err != nil {
+		host = "unknown"
+	}
+	return fmt.Sprintf("ctag-%s-%d@%s", os.Args[0], os.Getpid(), host)
 }
 
 // LoadAndParse creates a new instance of config by parsing the content of teh given file.

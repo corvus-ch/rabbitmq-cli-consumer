@@ -4,6 +4,8 @@ import (
 	"fmt"
 	stdlog "log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
@@ -109,10 +111,41 @@ func Action(c *cli.Context) error {
 
 	client, err := consumer.NewFromConfig(cfg, l)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Failed creating consumer: %s", err), 1)
+		return err
 	}
+	defer client.Close()
 
-	return checkConsumeError(client.Consume(p))
+	done := make(chan bool)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	failure := make(chan error)
+
+	go func() {
+		err := client.Consume(p)
+		if err != nil {
+			failure <- err
+		}
+		done <- true
+	}()
+
+	for {
+		select {
+		case err := <-client.NotifyClose(make(chan error)):
+			return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
+
+		case s := <-sig:
+			l.Infof("Consumer stopped with signal: %v", s)
+			if err := client.Cancel(); err != nil {
+				return fmt.Errorf("failed to cancel consumption of messages")
+			}
+			l.Info("Waiting for processors to finish…")
+			<-done
+			return nil
+
+		case err := <-failure:
+			return checkConsumeError(err)
+		}
+	}
 }
 
 func checkConsumeError(err error) error {
