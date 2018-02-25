@@ -55,7 +55,7 @@ func (b *ArgumentBuilder) SetCaptureOutput(capture bool) {
 	b.capture = capture
 }
 
-func (b *ArgumentBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (Command, error) {
+func (b *ArgumentBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (*exec.Cmd, error) {
 	var err error
 	payload := body
 	if b.WithMetadata {
@@ -87,7 +87,7 @@ func (b *ArgumentBuilder) GetCommand(p delivery.Properties, d delivery.Info, bod
 		cmd.Stderr = b.errorWriter
 	}
 
-	return NewExecCommand(cmd, b.log), nil
+	return cmd, nil
 }
 
 func (b *ArgumentBuilder) payloadBuffer(payload []byte) (*bytes.Buffer, error) {

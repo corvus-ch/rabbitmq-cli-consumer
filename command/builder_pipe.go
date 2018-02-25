@@ -51,7 +51,7 @@ func (b *PipeBuilder) SetCaptureOutput(capture bool) {
 	b.capture = capture
 }
 
-func (b *PipeBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (Command, error) {
+func (b *PipeBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (*exec.Cmd, error) {
 
 	meta, err := json.Marshal(&struct {
 		Properties   delivery.Properties `json:"properties"`
@@ -84,5 +84,5 @@ func (b *PipeBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []
 	w.Write(meta)
 	w.Close()
 
-	return NewExecCommand(cmd, b.log), nil
+	return cmd, nil
 }

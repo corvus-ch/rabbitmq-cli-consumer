@@ -5,19 +5,16 @@ import (
 	"io"
 	"os"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/streadway/amqp"
 	"github.com/thockin/logr"
 )
 
 type Consumer struct {
-	Connection   Connection
-	Builder      command.Builder
-	Acknowledger acknowledger.Acknowledger
-	Log          logr.Logger
+	Connection Connection
+	Log        logr.Logger
 }
 
 // ConnectionCloseHandler calls os.Exit after the connection to RabbitMQ got closed.
@@ -28,7 +25,7 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 }
 
 // Consume subscribes itself to the message queue and starts consuming messages.
-func (c *Consumer) Consume() error {
+func (c *Consumer) Consume(p processor.Processor) error {
 	c.Log.Info("Registering consumer... ")
 	msgs, err := c.Connection.Consume()
 	if err != nil {
@@ -48,7 +45,20 @@ func (c *Consumer) Consume() error {
 
 	go func() {
 		for d := range msgs {
-			c.ProcessMessage(delivery.New(d))
+			err := p.Process(delivery.New(d))
+			if err == nil {
+				continue
+			}
+
+			switch err.(type) {
+			case *processor.CreateCommandError:
+				c.Log.Error(err)
+
+			case *processor.AcknowledgmentError:
+				c.Log.Error(err)
+				c.Connection.Close()
+				os.Exit(11)
+			}
 		}
 	}()
 
@@ -58,25 +68,8 @@ func (c *Consumer) Consume() error {
 	return nil
 }
 
-// ProcessMessage processes a single message by running the executable.
-func (c *Consumer) ProcessMessage(d delivery.Delivery) {
-	cmd, err := c.Builder.GetCommand(d.Properties(), d.Info(), d.Body())
-	if err != nil {
-		c.Log.Errorf("failed to create command: %v", err)
-		d.Nack(true)
-		return
-	}
-
-	exitCode := cmd.Run()
-
-	if err := c.Acknowledger.Ack(d, exitCode); err != nil {
-		c.Log.Errorf("Message acknowledgement error: %v", err)
-		os.Exit(11)
-	}
-}
-
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, builder command.Builder, ack acknowledger.Acknowledger, l logr.Logger) (*Consumer, error) {
+func New(cfg *config.Config, l logr.Logger) (*Consumer, error) {
 	conn, err := NewConnection(cfg, l)
 	if err != nil {
 		return nil, err
@@ -87,10 +80,8 @@ func New(cfg *config.Config, builder command.Builder, ack acknowledger.Acknowled
 	}
 
 	return &Consumer{
-		Connection:   conn,
-		Builder:      builder,
-		Acknowledger: ack,
-		Log:          l,
+		Connection: conn,
+		Log:        l,
 	}, nil
 }
 
