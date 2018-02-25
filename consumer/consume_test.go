@@ -9,6 +9,7 @@ import (
 
 	"github.com/bouk/monkey"
 	log "github.com/corvus-ch/logr/buffered"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
@@ -49,7 +50,7 @@ func TestProcessing(t *testing.T) {
 			body := []byte(test.name)
 			c := consumer.Consumer{
 				Builder:      b,
-				Acknowledger: consumer.NewAcknowledger(test.strict, test.onFailure),
+				Acknowledger: acknowledger.New(test.strict, test.onFailure),
 			}
 
 			b.On("GetCommand", p, di, body).Return(cmd, nil)
@@ -108,7 +109,7 @@ func TestStrictDefault(t *testing.T) {
 	body := []byte("strictDefault")
 	c := consumer.Consumer{
 		Builder:      b,
-		Acknowledger: &consumer.StrictAcknowledger{},
+		Acknowledger: &acknowledger.Strict{},
 		Log:          log.New(0),
 	}
 
