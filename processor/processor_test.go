@@ -1,22 +1,57 @@
-package consumer_test
+package processor
 
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
 	"testing"
 
-	"github.com/bouk/monkey"
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
+	"github.com/sebdah/goldie"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/thockin/logr"
 )
+
+var execCommandRunTests = []struct {
+	name string
+	cmd  *exec.Cmd
+	code int
+}{
+	{
+		"success",
+		testCommand("echo", false, []string{}...),
+		0,
+	},
+	{
+		"error",
+		testCommand("error", false, "lorem", "ipsum"),
+		1,
+	},
+	{
+		"errorCapture",
+		testCommand("error", true, "dolor", "sit"),
+		1,
+	},
+}
+
+func TestProcessor_Run(t *testing.T) {
+	for _, test := range execCommandRunTests {
+		t.Run(test.name, func(t *testing.T) {
+			l := log.New(0)
+			p := processor{l: l, cmd: test.cmd}
+
+			assert.Equal(t, p.run(), test.code)
+			goldie.Assert(t, t.Name(), l.Buf().Bytes())
+		})
+	}
+}
 
 var processingTests = []struct {
 	name      string
@@ -44,89 +79,98 @@ func TestProcessing(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			d := new(TestDelivery)
 			b := new(TestBuilder)
-			p := delivery.Properties{}
+			pr := delivery.Properties{}
 			di := delivery.Info{}
-			cmd := new(TestCommand)
+			cmd := testCommand("exit", true, fmt.Sprintf("%d", test.exit))
 			body := []byte(test.name)
-			c := consumer.Consumer{
-				Builder:      b,
-				Acknowledger: acknowledger.New(test.strict, test.onFailure),
+			p := &processor{
+				b: b,
+				a: acknowledger.New(test.strict, test.onFailure),
+				l: log.New(0),
 			}
 
-			b.On("GetCommand", p, di, body).Return(cmd, nil)
+			b.On("GetCommand", pr, di, body).Return(cmd, nil)
 			d.On("Body").Return(body)
 			d.On(test.ackMethod, test.ackArgs...).Return(nil)
-			d.On("Properties").Return(p)
+			d.On("Properties").Return(pr)
 			d.On("Info").Return(di)
-			cmd.On("Run").Return(test.exit)
 
-			c.ProcessMessage(d)
+			p.Process(d)
 
 			d.AssertExpectations(t)
 			b.AssertExpectations(t)
-			cmd.AssertExpectations(t)
 		})
 	}
 }
 
-func TestCommandFailure(t *testing.T) {
-	l := log.New(0)
-	d := new(TestDelivery)
-	b := new(TestBuilder)
-	p := delivery.Properties{}
-	di := delivery.Info{}
-	body := []byte("cmdFailure")
-	c := consumer.Consumer{
-		Builder: b,
-		Log:     l,
+func testCommand(command string, capture bool, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestHelperProcess", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+	if capture {
+		cmd.Stdout = ioutil.Discard
+		cmd.Stderr = ioutil.Discard
 	}
 
-	b.On("GetCommand", p, di, body).Return(new(TestCommand), fmt.Errorf("failed from test"))
-	d.On("Body").Return(body)
-	d.On("Nack", true, true).Return(nil)
-	d.On("Properties").Return(p)
-	d.On("Info").Return(di)
-
-	c.ProcessMessage(d)
-
-	assert.Equal(t, "ERROR failed to create command: failed from test\n", l.Buf().String())
-	d.AssertExpectations(t)
-	b.AssertExpectations(t)
+	return cmd
 }
 
-func TestStrictDefault(t *testing.T) {
-	fakeExit := func(code int) {
-		panic(fmt.Sprintf("os.Exit called with: %v", code))
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
 	}
-	patch := monkey.Patch(os.Exit, fakeExit)
-	defer patch.Unpatch()
+	defer os.Exit(0)
 
-	d := new(TestDelivery)
-	b := new(TestBuilder)
-	p := delivery.Properties{}
-	di := delivery.Info{}
-	cmd := new(TestCommand)
-	body := []byte("strictDefault")
-	c := consumer.Consumer{
-		Builder:      b,
-		Acknowledger: &acknowledger.Strict{},
-		Log:          log.New(0),
+	args := helperProcessArgs()
+	helperProcessAssertArgs(args)
+
+	cmd, args := args[0], args[1:]
+	switch cmd {
+	case "echo":
+		helperProcessCmdEcho(args, 0)
+
+	case "error":
+		helperProcessCmdEcho(args, 1)
+
+	case "exit":
+		code, err := strconv.Atoi(args[0])
+		if err != nil {
+			code = 0
+		}
+		helperProcessCmdEcho(args[1:], code)
+
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command %q\n", cmd)
+		os.Exit(2)
+	}
+}
+
+func helperProcessArgs() []string {
+	args := os.Args
+	for len(args) > 0 {
+		if args[0] == "--" {
+			args = args[1:]
+			break
+		}
+		args = args[1:]
 	}
 
-	b.On("GetCommand", p, di, body).Return(cmd, nil)
-	d.On("Body").Return(body)
-	d.On("Nack", true, true).Return(nil)
-	d.On("Properties").Return(p)
-	d.On("Info").Return(di)
-	cmd.On("Run").Return(1)
+	return args
+}
 
-	assert.PanicsWithValue(t, "os.Exit called with: 11", func() {
-		c.ProcessMessage(d)
-	}, "os.Exit was not called")
+func helperProcessAssertArgs(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "No command")
+		os.Exit(2)
+	}
+}
 
-	d.AssertExpectations(t)
-	b.AssertExpectations(t)
-	cmd.AssertExpectations(t)
+func helperProcessCmdEcho(args []string, code int) {
+	for _, a := range args {
+		fmt.Println(a)
+	}
+	os.Exit(code)
 }
 
 type TestBuilder struct {
@@ -150,23 +194,10 @@ func (b *TestBuilder) SetCommand(cmd string) {
 	b.Called(cmd)
 }
 
-func (b *TestBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (command.Command, error) {
+func (b *TestBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (*exec.Cmd, error) {
 	argsT := b.Called(p, d, body)
 
-	return argsT.Get(0).(command.Command), argsT.Error(1)
-}
-
-type TestCommand struct {
-	command.Command
-	mock.Mock
-}
-
-func (t TestCommand) Run() int {
-	return t.Called().Int(0)
-}
-
-func (t TestCommand) Cmd() *exec.Cmd {
-	return t.Called().Get(0).(*exec.Cmd)
+	return argsT.Get(0).(*exec.Cmd), argsT.Error(1)
 }
 
 type TestDelivery struct {
