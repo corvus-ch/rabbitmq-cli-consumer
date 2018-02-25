@@ -1,4 +1,4 @@
-package metadata
+package delivery
 
 import (
 	"time"
@@ -6,22 +6,24 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Properties represents the properties of an AMQP message.
 type Properties struct {
 	Headers         amqp.Table `json:"application_headers"`
 	ContentType     string     `json:"content_type"`
 	ContentEncoding string     `json:"content_encoding"`
 	DeliveryMode    uint8      `json:"delivery_mode"`
 	Priority        uint8      `json:"priority"`
-	CorrelationId   string     `json:"correlation_id"`
+	CorrelationID   string     `json:"correlation_id"`
 	ReplyTo         string     `json:"reply_to"`
 	Expiration      string     `json:"expiration"`
-	MessageId       string     `json:"message_id"`
+	MessageID       string     `json:"message_id"`
 	Timestamp       time.Time  `json:"timestamp"`
 	Type            string     `json:"type"`
-	UserId          string     `json:"user_id"`
-	AppId           string     `json:"app_id"`
+	UserID          string     `json:"user_id"`
+	AppID           string     `json:"app_id"`
 }
 
+// NewProperties creates a new properties struct from the AMQP message.
 func NewProperties(d amqp.Delivery) Properties {
 	return Properties{
 		Headers:         d.Headers,
@@ -29,13 +31,13 @@ func NewProperties(d amqp.Delivery) Properties {
 		ContentEncoding: d.ContentEncoding,
 		DeliveryMode:    d.DeliveryMode,
 		Priority:        d.Priority,
-		CorrelationId:   d.CorrelationId,
+		CorrelationID:   d.CorrelationId,
 		ReplyTo:         d.ReplyTo,
 		Expiration:      d.Expiration,
-		MessageId:       d.MessageId,
+		MessageID:       d.MessageId,
 		Timestamp:       d.Timestamp,
 		Type:            d.Type,
-		AppId:           d.AppId,
-		UserId:          d.UserId,
+		AppID:           d.AppId,
+		UserID:          d.UserId,
 	}
 }

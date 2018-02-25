@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/thockin/logr"
 )
 
@@ -55,14 +55,14 @@ func (b *ArgumentBuilder) SetCaptureOutput(capture bool) {
 	b.capture = capture
 }
 
-func (b *ArgumentBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error) {
+func (b *ArgumentBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (Command, error) {
 	var err error
 	payload := body
 	if b.WithMetadata {
 		payload, err = json.Marshal(&struct {
-			Properties   metadata.Properties   `json:"properties"`
-			DeliveryInfo metadata.DeliveryInfo `json:"delivery_info"`
-			Body         string                `json:"body"`
+			Properties   delivery.Properties `json:"properties"`
+			DeliveryInfo delivery.Info       `json:"delivery_info"`
+			Body         string              `json:"body"`
 		}{
 
 			Properties:   p,
