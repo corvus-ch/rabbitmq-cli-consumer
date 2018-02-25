@@ -11,7 +11,7 @@ import (
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/thockin/logr"
@@ -43,8 +43,8 @@ func TestProcessing(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			d := new(TestDelivery)
 			b := new(TestBuilder)
-			p := metadata.Properties{}
-			di := metadata.DeliveryInfo{}
+			p := delivery.Properties{}
+			di := delivery.Info{}
 			cmd := new(TestCommand)
 			body := []byte(test.name)
 			c := consumer.Consumer{
@@ -55,9 +55,11 @@ func TestProcessing(t *testing.T) {
 			b.On("GetCommand", p, di, body).Return(cmd, nil)
 			d.On("Body").Return(body)
 			d.On(test.ackMethod, test.ackArgs...).Return(nil)
+			d.On("Properties").Return(p)
+			d.On("Info").Return(di)
 			cmd.On("Run").Return(test.exit)
 
-			c.ProcessMessage(d, p, di)
+			c.ProcessMessage(d)
 
 			d.AssertExpectations(t)
 			b.AssertExpectations(t)
@@ -70,8 +72,8 @@ func TestCommandFailure(t *testing.T) {
 	l := log.New(0)
 	d := new(TestDelivery)
 	b := new(TestBuilder)
-	p := metadata.Properties{}
-	di := metadata.DeliveryInfo{}
+	p := delivery.Properties{}
+	di := delivery.Info{}
 	body := []byte("cmdFailure")
 	c := consumer.Consumer{
 		Builder: b,
@@ -81,8 +83,10 @@ func TestCommandFailure(t *testing.T) {
 	b.On("GetCommand", p, di, body).Return(new(TestCommand), fmt.Errorf("failed from test"))
 	d.On("Body").Return(body)
 	d.On("Nack", true, true).Return(nil)
+	d.On("Properties").Return(p)
+	d.On("Info").Return(di)
 
-	c.ProcessMessage(d, p, di)
+	c.ProcessMessage(d)
 
 	assert.Equal(t, "ERROR failed to create command: failed from test\n", l.Buf().String())
 	d.AssertExpectations(t)
@@ -98,8 +102,8 @@ func TestStrictDefault(t *testing.T) {
 
 	d := new(TestDelivery)
 	b := new(TestBuilder)
-	p := metadata.Properties{}
-	di := metadata.DeliveryInfo{}
+	p := delivery.Properties{}
+	di := delivery.Info{}
 	cmd := new(TestCommand)
 	body := []byte("strictDefault")
 	c := consumer.Consumer{
@@ -111,10 +115,12 @@ func TestStrictDefault(t *testing.T) {
 	b.On("GetCommand", p, di, body).Return(cmd, nil)
 	d.On("Body").Return(body)
 	d.On("Nack", true, true).Return(nil)
+	d.On("Properties").Return(p)
+	d.On("Info").Return(di)
 	cmd.On("Run").Return(1)
 
 	assert.PanicsWithValue(t, "os.Exit called with: 11", func() {
-		c.ProcessMessage(d, p, di)
+		c.ProcessMessage(d)
 	}, "os.Exit was not called")
 
 	d.AssertExpectations(t)
@@ -143,7 +149,7 @@ func (b *TestBuilder) SetCommand(cmd string) {
 	b.Called(cmd)
 }
 
-func (b *TestBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (command.Command, error) {
+func (b *TestBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (command.Command, error) {
 	argsT := b.Called(p, d, body)
 
 	return argsT.Get(0).(command.Command), argsT.Error(1)
@@ -160,4 +166,45 @@ func (t TestCommand) Run() int {
 
 func (t TestCommand) Cmd() *exec.Cmd {
 	return t.Called().Get(0).(*exec.Cmd)
+}
+
+type TestDelivery struct {
+	delivery.Delivery
+	mock.Mock
+}
+
+func (t *TestDelivery) Ack(multiple bool) error {
+	argstT := t.Called(multiple)
+
+	return argstT.Error(0)
+}
+
+func (t *TestDelivery) Nack(multiple bool, requeue bool) error {
+	argsT := t.Called(multiple, requeue)
+
+	return argsT.Error(0)
+}
+
+func (t *TestDelivery) Reject(requeue bool) error {
+	argsT := t.Called(requeue)
+
+	return argsT.Error(0)
+}
+
+func (t *TestDelivery) Body() []byte {
+	argsT := t.Called()
+
+	return argsT.Get(0).([]byte)
+}
+
+func (t *TestDelivery) Properties() delivery.Properties {
+	argsT := t.Called()
+
+	return argsT.Get(0).(delivery.Properties)
+}
+
+func (t *TestDelivery) Info() delivery.Info {
+	argsT := t.Called()
+
+	return argsT.Get(0).(delivery.Info)
 }

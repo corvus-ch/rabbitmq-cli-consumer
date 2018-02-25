@@ -1,10 +1,10 @@
-package consumer_test
+package delivery_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/magiconair/properties/assert"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +16,7 @@ var ackTests = []struct {
 	tag    uint64
 	args   []interface{}
 	err    error
-	call   func(d consumer.Delivery) error
+	call   func(d delivery.Delivery) error
 }{
 	{
 		"ackMultiple",
@@ -24,7 +24,7 @@ var ackTests = []struct {
 		3,
 		[]interface{}{true},
 		nil,
-		func(d consumer.Delivery) error { return d.Ack(true) },
+		func(d delivery.Delivery) error { return d.Ack(true) },
 	},
 	{
 		"ackSingle",
@@ -32,7 +32,7 @@ var ackTests = []struct {
 		5,
 		[]interface{}{false},
 		nil,
-		func(d consumer.Delivery) error { return d.Ack(false) },
+		func(d delivery.Delivery) error { return d.Ack(false) },
 	},
 	{
 		"ackError",
@@ -40,7 +40,7 @@ var ackTests = []struct {
 		7,
 		[]interface{}{true},
 		fmt.Errorf("ack"),
-		func(d consumer.Delivery) error { return d.Ack(true) },
+		func(d delivery.Delivery) error { return d.Ack(true) },
 	},
 	{
 		"nackMultiple",
@@ -48,7 +48,7 @@ var ackTests = []struct {
 		11,
 		[]interface{}{true, false},
 		nil,
-		func(d consumer.Delivery) error { return d.Nack(true, false) },
+		func(d delivery.Delivery) error { return d.Nack(true, false) },
 	},
 	{
 		"nackMultipleRequeue",
@@ -56,7 +56,7 @@ var ackTests = []struct {
 		17,
 		[]interface{}{true, true},
 		nil,
-		func(d consumer.Delivery) error { return d.Nack(true, true) },
+		func(d delivery.Delivery) error { return d.Nack(true, true) },
 	},
 	{
 		"nackError",
@@ -64,7 +64,7 @@ var ackTests = []struct {
 		19,
 		[]interface{}{true, true},
 		fmt.Errorf("nack"),
-		func(d consumer.Delivery) error { return d.Nack(true, true) },
+		func(d delivery.Delivery) error { return d.Nack(true, true) },
 	},
 	{
 		"rejectMultiple",
@@ -72,7 +72,7 @@ var ackTests = []struct {
 		23,
 		[]interface{}{true},
 		nil,
-		func(d consumer.Delivery) error { return d.Reject(true) },
+		func(d delivery.Delivery) error { return d.Reject(true) },
 	},
 	{
 		"rejectSingle",
@@ -80,7 +80,7 @@ var ackTests = []struct {
 		29,
 		[]interface{}{false},
 		nil,
-		func(d consumer.Delivery) error { return d.Reject(false) },
+		func(d delivery.Delivery) error { return d.Reject(false) },
 	},
 	{
 		"rejectError",
@@ -88,15 +88,15 @@ var ackTests = []struct {
 		31,
 		[]interface{}{true},
 		fmt.Errorf("reject"),
-		func(d consumer.Delivery) error { return d.Reject(true) },
+		func(d delivery.Delivery) error { return d.Reject(true) },
 	},
 }
 
 func TestRabbitMqDelivery(t *testing.T) {
 	for _, test := range ackTests {
 		t.Run(test.name, func(t *testing.T) {
-			a := TestAmqpAcknowledger{}
-			d := consumer.NewRabbitMqDelivery(amqp.Delivery{
+			a := TestAcknowledger{}
+			d := delivery.New(amqp.Delivery{
 				Acknowledger: &a,
 				DeliveryTag:  test.tag,
 				Body:         []byte(test.name),
@@ -109,53 +109,24 @@ func TestRabbitMqDelivery(t *testing.T) {
 	}
 }
 
-type TestDelivery struct {
-	consumer.Delivery
-	mock.Mock
-}
-
-func (t *TestDelivery) Ack(multiple bool) error {
-	argstT := t.Called(multiple)
-
-	return argstT.Error(0)
-}
-
-func (t *TestDelivery) Nack(multiple bool, requeue bool) error {
-	argsT := t.Called(multiple, requeue)
-
-	return argsT.Error(0)
-}
-
-func (t *TestDelivery) Reject(requeue bool) error {
-	argsT := t.Called(requeue)
-
-	return argsT.Error(0)
-}
-
-func (t *TestDelivery) Body() []byte {
-	argsT := t.Called()
-
-	return argsT.Get(0).([]byte)
-}
-
-type TestAmqpAcknowledger struct {
+type TestAcknowledger struct {
 	amqp.Acknowledger
 	mock.Mock
 }
 
-func (t TestAmqpAcknowledger) Ack(tag uint64, multiple bool) error {
+func (t TestAcknowledger) Ack(tag uint64, multiple bool) error {
 	argstT := t.Called(tag, multiple)
 
 	return argstT.Error(0)
 }
 
-func (t TestAmqpAcknowledger) Nack(tag uint64, multiple bool, requeue bool) error {
+func (t TestAcknowledger) Nack(tag uint64, multiple bool, requeue bool) error {
 	argstT := t.Called(tag, multiple, requeue)
 
 	return argstT.Error(0)
 }
 
-func (t TestAmqpAcknowledger) Reject(tag uint64, requeue bool) error {
+func (t TestAcknowledger) Reject(tag uint64, requeue bool) error {
 	argstT := t.Called(tag, requeue)
 
 	return argstT.Error(0)

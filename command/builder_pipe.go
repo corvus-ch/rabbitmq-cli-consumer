@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/thockin/logr"
 )
 
@@ -51,11 +51,11 @@ func (b *PipeBuilder) SetCaptureOutput(capture bool) {
 	b.capture = capture
 }
 
-func (b *PipeBuilder) GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error) {
+func (b *PipeBuilder) GetCommand(p delivery.Properties, d delivery.Info, body []byte) (Command, error) {
 
 	meta, err := json.Marshal(&struct {
-		Properties   metadata.Properties   `json:"properties"`
-		DeliveryInfo metadata.DeliveryInfo `json:"delivery_info"`
+		Properties   delivery.Properties `json:"properties"`
+		DeliveryInfo delivery.Info       `json:"delivery_info"`
 	}{
 
 		Properties:   p,
