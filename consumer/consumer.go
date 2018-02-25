@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
@@ -15,7 +16,7 @@ import (
 type Consumer struct {
 	Connection   Connection
 	Builder      command.Builder
-	Acknowledger Acknowledger
+	Acknowledger acknowledger.Acknowledger
 	Log          logr.Logger
 }
 
@@ -75,7 +76,7 @@ func (c *Consumer) ProcessMessage(d delivery.Delivery) {
 }
 
 // New returns a initialized consumer based on config
-func New(cfg *config.Config, builder command.Builder, ack Acknowledger, l logr.Logger) (*Consumer, error) {
+func New(cfg *config.Config, builder command.Builder, ack acknowledger.Acknowledger, l logr.Logger) (*Consumer, error) {
 	conn, err := NewConnection(cfg, l)
 	if err != nil {
 		return nil, err

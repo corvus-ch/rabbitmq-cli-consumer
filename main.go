@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/codegangsta/cli"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
@@ -102,7 +103,7 @@ func Action(c *cli.Context) error {
 		return fmt.Errorf("failed to create command builder: %v", err)
 	}
 
-	ack := consumer.NewAcknowledger(c.Bool("strict-exit-code"), cfg.RabbitMq.Onfailure)
+	ack := acknowledger.NewFromConfig(cfg)
 
 	client, err := consumer.New(cfg, builder, ack, l)
 	if err != nil {
@@ -177,6 +178,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("verbose") {
 		cfg.Logs.Verbose = c.Bool("verbose")
+	}
+
+	if c.IsSet("strict-exit-code") {
+		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
 	}
 
 	return cfg, nil
