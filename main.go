@@ -6,10 +6,12 @@ import (
 	"os"
 
 	"github.com/codegangsta/cli"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 )
 
 var (
@@ -102,14 +104,23 @@ func Action(c *cli.Context) error {
 		return fmt.Errorf("failed to create command builder: %v", err)
 	}
 
-	ack := consumer.NewAcknowledger(c.Bool("strict-exit-code"), cfg.RabbitMq.Onfailure)
+	ack := acknowledger.NewFromConfig(cfg)
+	p := processor.New(builder, ack, l)
 
-	client, err := consumer.New(cfg, builder, ack, l)
+	client, err := consumer.NewFromConfig(cfg, l)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Failed creating consumer: %s", err), 1)
 	}
 
-	client.Consume()
+	if err := client.Consume(p); err != nil {
+		switch err.(type) {
+		case *processor.AcknowledgmentError:
+			return cli.NewExitError(err, 11)
+
+		default:
+			return err
+		}
+	}
 
 	return nil
 }
@@ -177,6 +188,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("verbose") {
 		cfg.Logs.Verbose = c.Bool("verbose")
+	}
+
+	if c.IsSet("strict-exit-code") {
+		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
 	}
 
 	return cfg, nil

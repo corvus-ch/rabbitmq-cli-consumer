@@ -1,10 +1,10 @@
-package metadata
+package delivery
 
 import (
 	"github.com/streadway/amqp"
 )
 
-type DeliveryInfo struct {
+type Info struct {
 	MessageCount uint32 `json:"message_count"`
 	ConsumerTag  string `json:"consumer_tag"`
 	DeliveryTag  uint64 `json:"delivery_tag"`
@@ -13,8 +13,8 @@ type DeliveryInfo struct {
 	RoutingKey   string `json:"routing_key"`
 }
 
-func NewDeliveryInfo(d amqp.Delivery) DeliveryInfo {
-	return DeliveryInfo{
+func NewDeliveryInfo(d amqp.Delivery) Info {
+	return Info{
 		ConsumerTag:  d.ConsumerTag,
 		MessageCount: d.MessageCount,
 		DeliveryTag:  d.DeliveryTag,

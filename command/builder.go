@@ -2,8 +2,9 @@ package command
 
 import (
 	"io"
+	"os/exec"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/thockin/logr"
 )
 
@@ -25,7 +26,7 @@ type Builder interface {
 	SetCommand(cmd string)
 
 	// GetCommand gets the executable command for the given message data.
-	GetCommand(p metadata.Properties, d metadata.DeliveryInfo, body []byte) (Command, error)
+	GetCommand(p delivery.Properties, d delivery.Info, body []byte) (*exec.Cmd, error)
 }
 
 // NewBuilder ensures a builder struct is setup and ready to be used.

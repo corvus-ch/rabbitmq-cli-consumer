@@ -1,22 +1,59 @@
 package consumer
 
 import (
-	"io"
+	"fmt"
 	"os"
 
-	"fmt"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/streadway/amqp"
 	"github.com/thockin/logr"
 )
 
 type Consumer struct {
-	Connection   Connection
-	Builder      command.Builder
-	Acknowledger Acknowledger
-	Log          logr.Logger
+	Connection Connection
+	Channel    Channel
+	Queue      string
+	Log        logr.Logger
+}
+
+// New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
+// calling code.
+func New(conn Connection, ch Channel, queue string, l logr.Logger) *Consumer {
+	return &Consumer{
+		Connection: conn,
+		Channel:    ch,
+		Queue:      queue,
+		Log:        l,
+	}
+}
+
+// NewFromConfig creates a new consumer instance. The setup of the amqp connection and channel is done according to the
+// configuration.
+func NewFromConfig(cfg *config.Config, l logr.Logger) (*Consumer, error) {
+	l.Info("Connecting RabbitMQ...")
+	conn, err := amqp.Dial(cfg.AmqpUrl())
+	if nil != err {
+		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
+	}
+	l.Info("Connected.")
+
+	l.Info("Opening channel...")
+	ch, err := conn.Channel()
+	if nil != err {
+		return nil, fmt.Errorf("failed to open a channel: %v", err)
+	}
+	l.Info("Done.")
+
+	Setup(cfg, ch, l)
+
+	return &Consumer{
+		Connection: conn,
+		Channel:    ch,
+		Queue:      cfg.RabbitMq.Queue,
+		Log:        l,
+	}, nil
 }
 
 // ConnectionCloseHandler calls os.Exit after the connection to RabbitMQ got closed.
@@ -27,9 +64,9 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 }
 
 // Consume subscribes itself to the message queue and starts consuming messages.
-func (c *Consumer) Consume() error {
+func (c *Consumer) Consume(p processor.Processor) error {
 	c.Log.Info("Registering consumer... ")
-	msgs, err := c.Connection.Consume()
+	msgs, err := c.Channel.Consume(c.Queue, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("failed to register a consumer: %s", err)
 	}
@@ -38,67 +75,24 @@ func (c *Consumer) Consume() error {
 
 	defer c.Connection.Close()
 
-	closeErr := make(chan *amqp.Error)
-	closeErr = c.Connection.NotifyClose(closeErr)
-
-	go ConnectionCloseHandler(closeErr, c)
-
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			c.ProcessMessage(NewRabbitMqDelivery(d), metadata.NewProperties(d), metadata.NewDeliveryInfo(d))
-		}
-	}()
+	go ConnectionCloseHandler(c.Channel.NotifyClose(make(chan *amqp.Error)), c)
 
 	c.Log.Info("Waiting for messages...")
-	<-forever
+
+	for d := range msgs {
+		err := p.Process(delivery.New(d))
+		if err == nil {
+			continue
+		}
+
+		switch err.(type) {
+		case *processor.CreateCommandError:
+			c.Log.Error(err)
+
+		default:
+			return err
+		}
+	}
 
 	return nil
-}
-
-// ProcessMessage processes a single message by running the executable.
-func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.DeliveryInfo) {
-	cmd, err := c.Builder.GetCommand(p, m, d.Body())
-	if err != nil {
-		c.Log.Errorf("failed to create command: %v", err)
-		d.Nack(true, true)
-		return
-	}
-
-	exitCode := cmd.Run()
-
-	if err := c.Acknowledger.Ack(d, exitCode); err != nil {
-		c.Log.Errorf("Message acknowledgement error: %v", err)
-		os.Exit(11)
-	}
-}
-
-// New returns a initialized consumer based on config
-func New(cfg *config.Config, builder command.Builder, ack Acknowledger, l logr.Logger) (*Consumer, error) {
-	conn, err := NewConnection(cfg, l)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := conn.Setup(); err != nil {
-		return nil, err
-	}
-
-	return &Consumer{
-		Connection:   conn,
-		Builder:      builder,
-		Acknowledger: ack,
-		Log:          l,
-	}, nil
-}
-
-type Channel interface {
-	io.Closer
-	ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error
-	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
-	Qos(prefetchCount, prefetchSize int, global bool) error
-	QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error
-	Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error)
-	Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
 }
