@@ -137,4 +137,47 @@ func TestConsumer_Cancel(t *testing.T) {
 		assert.Equal(t, err, c.Cancel())
 		ch.AssertExpectations(t)
 	})
+	t.Run("reject remaining", func(t *testing.T) {
+		sync := make(chan bool)
+		done := make(chan error)
+		msgs := make(chan amqp.Delivery)
+		a := new(TestAmqpAcknowledger)
+		deliveries := []amqp.Delivery{
+			{Acknowledger: a, DeliveryTag: 3},
+			{Acknowledger: a, DeliveryTag: 5},
+			{Acknowledger: a, DeliveryTag: 7},
+		}
+		for i, d := range deliveries {
+			if i == 0 {
+				continue
+			}
+			a.On("Reject", d.DeliveryTag, true).Once().Return(nil)
+		}
+		ch := new(TestChannel)
+		ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
+		ch.On("Cancel", "ctag", false).Return(nil)
+		c := consumer.New(nil, ch, t.Name(), "ctag", log.New(0))
+		p := new(TestProcessor)
+		p.On("Process", delivery.New(deliveries[0])).Return(nil).Run(func(_ mock.Arguments) {
+			sync <- true
+			<-sync
+		})
+		go func() {
+			err := c.Consume(p)
+			done <- err
+		}()
+		go func() {
+			for _, d := range deliveries {
+				msgs <- d
+			}
+			close(msgs)
+		}()
+		<-sync
+		c.Cancel()
+		sync <- true
+		assert.Nil(t, <-done)
+		ch.AssertExpectations(t)
+		p.AssertExpectations(t)
+		a.AssertExpectations(t)
+	})
 }

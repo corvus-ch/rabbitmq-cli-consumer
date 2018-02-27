@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
@@ -17,6 +16,7 @@ type Consumer struct {
 	Queue      string
 	Tag        string
 	Log        logr.Logger
+	canceled   bool
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
@@ -71,6 +71,13 @@ func (c *Consumer) Consume(p processor.Processor) error {
 	c.Log.Info("Waiting for messages...")
 
 	for d := range msgs {
+		if c.canceled {
+			if err := d.Reject(true); err != nil {
+				return err
+			}
+			continue
+		}
+
 		if err := p.Process(delivery.New(d)); err != nil {
 			switch err.(type) {
 			case *processor.CreateCommandError:
@@ -89,7 +96,11 @@ func (c *Consumer) Consume(p processor.Processor) error {
 //
 // All messages already received will still be processed.
 func (c *Consumer) Cancel() error {
-	return c.Channel.Cancel(c.Tag, false)
+	err := c.Channel.Cancel(c.Tag, false)
+	if err == nil {
+		c.canceled = true
+	}
+	return err
 }
 
 // Close tears the connection down, taking the channel with it.
