@@ -8,7 +8,7 @@ import (
 
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ func assertWriter(t *testing.T, exp *bytes.Buffer, got io.Writer, captured bool)
 }
 
 func createAndAssertCommand(t *testing.T, b command.Builder, body []byte) *exec.Cmd {
-	c, err := b.GetCommand(metadata.Properties{}, metadata.DeliveryInfo{}, body)
+	c, err := b.GetCommand(delivery.Properties{}, delivery.Info{}, body)
 	if err != nil {
 		t.Errorf("failed to create command: %v", err)
 	}

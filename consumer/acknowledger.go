@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"fmt"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 )
 
 // Mapping of script exit codes and message acknowledgment.
@@ -15,7 +16,7 @@ const (
 
 // Message acknowledgment depending on the scripts exit code.
 type Acknowledger interface {
-	Ack(d Delivery, code int) error
+	Ack(d delivery.Delivery, code int) error
 }
 
 // Creates new Acknowledger using strict or default behaviour.
@@ -36,9 +37,9 @@ type DefaultAcknowledger struct {
 }
 
 // Default acknowledgment using a predefined behaviour on script error.
-func (a DefaultAcknowledger) Ack(d Delivery, code int) error {
+func (a DefaultAcknowledger) Ack(d delivery.Delivery, code int) error {
 	if code == exitAck {
-		d.Ack(true)
+		d.Ack()
 		return nil
 	}
 	switch a.OnFailure {
@@ -47,11 +48,11 @@ func (a DefaultAcknowledger) Ack(d Delivery, code int) error {
 	case exitRejectRequeue:
 		d.Reject(true)
 	case exitNack:
-		d.Nack(true, false)
+		d.Nack(false)
 	case exitNackRequeue:
-		d.Nack(true, true)
+		d.Nack(true)
 	default:
-		d.Nack(true, true)
+		d.Nack(true)
 	}
 	return nil
 }
@@ -62,20 +63,20 @@ type StrictAcknowledger struct {
 }
 
 // Strict acknowledgment returning an err if script exits with an unknown exit code.
-func (a StrictAcknowledger) Ack(d Delivery, code int) error {
+func (a StrictAcknowledger) Ack(d delivery.Delivery, code int) error {
 	switch code {
 	case exitAck:
-		d.Ack(true)
+		d.Ack()
 	case exitReject:
 		d.Reject(false)
 	case exitRejectRequeue:
 		d.Reject(true)
 	case exitNack:
-		d.Nack(true, false)
+		d.Nack(false)
 	case exitNackRequeue:
-		d.Nack(true, true)
+		d.Nack(true)
 	default:
-		d.Nack(true, true)
+		d.Nack(true)
 		return fmt.Errorf("unexpected exit code %v", code)
 	}
 

@@ -1,13 +1,13 @@
 package consumer
 
 import (
+	"fmt"
 	"io"
 	"os"
 
-	"fmt"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/metadata"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/streadway/amqp"
 	"github.com/thockin/logr"
 )
@@ -47,7 +47,7 @@ func (c *Consumer) Consume() error {
 
 	go func() {
 		for d := range msgs {
-			c.ProcessMessage(NewRabbitMqDelivery(d), metadata.NewProperties(d), metadata.NewDeliveryInfo(d))
+			c.ProcessMessage(delivery.New(d))
 		}
 	}()
 
@@ -58,11 +58,11 @@ func (c *Consumer) Consume() error {
 }
 
 // ProcessMessage processes a single message by running the executable.
-func (c *Consumer) ProcessMessage(d Delivery, p metadata.Properties, m metadata.DeliveryInfo) {
-	cmd, err := c.Builder.GetCommand(p, m, d.Body())
+func (c *Consumer) ProcessMessage(d delivery.Delivery) {
+	cmd, err := c.Builder.GetCommand(d.Properties(), d.Info(), d.Body())
 	if err != nil {
 		c.Log.Errorf("failed to create command: %v", err)
-		d.Nack(true, true)
+		d.Nack(true)
 		return
 	}
 
