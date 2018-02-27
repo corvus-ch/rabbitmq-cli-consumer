@@ -25,9 +25,9 @@ func createAndAssertCommand(t *testing.T, b command.Builder, body []byte) *exec.
 	if err != nil {
 		t.Errorf("failed to create command: %v", err)
 	}
-	assert.IsType(t, &command.ExecCommand{}, c)
+	assert.IsType(t, &exec.Cmd{}, c)
 
-	return c.Cmd()
+	return c
 }
 
 func createAndAssertBuilder(t *testing.T, b command.Builder, name string, capture bool) (command.Builder, *bytes.Buffer, *bytes.Buffer) {
