@@ -4,6 +4,9 @@ checks:
   method-complexity:
     config:
       threshold: 10
+  method-length:
+    config:
+      threshold: 32
 
 plugins:
   gofmt:
