@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
@@ -14,7 +13,47 @@ import (
 
 type Consumer struct {
 	Connection Connection
+	Channel    Channel
+	Queue      string
 	Log        logr.Logger
+}
+
+// New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
+// calling code.
+func New(conn Connection, ch Channel, queue string, l logr.Logger) *Consumer {
+	return &Consumer{
+		Connection: conn,
+		Channel:    ch,
+		Queue:      queue,
+		Log:        l,
+	}
+}
+
+// NewFromConfig creates a new consumer instance. The setup of the amqp connection and channel is done according to the
+// configuration.
+func NewFromConfig(cfg *config.Config, l logr.Logger) (*Consumer, error) {
+	l.Info("Connecting RabbitMQ...")
+	conn, err := amqp.Dial(cfg.AmqpUrl())
+	if nil != err {
+		return nil, fmt.Errorf("failed connecting RabbitMQ: %v", err)
+	}
+	l.Info("Connected.")
+
+	l.Info("Opening channel...")
+	ch, err := conn.Channel()
+	if nil != err {
+		return nil, fmt.Errorf("failed to open a channel: %v", err)
+	}
+	l.Info("Done.")
+
+	Setup(cfg, ch, l)
+
+	return &Consumer{
+		Connection: conn,
+		Channel:    ch,
+		Queue:      cfg.RabbitMq.Queue,
+		Log:        l,
+	}, nil
 }
 
 // ConnectionCloseHandler calls os.Exit after the connection to RabbitMQ got closed.
@@ -27,7 +66,7 @@ func ConnectionCloseHandler(closeErr chan *amqp.Error, c *Consumer) {
 // Consume subscribes itself to the message queue and starts consuming messages.
 func (c *Consumer) Consume(p processor.Processor) error {
 	c.Log.Info("Registering consumer... ")
-	msgs, err := c.Connection.Consume()
+	msgs, err := c.Channel.Consume(c.Queue, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("failed to register a consumer: %s", err)
 	}
@@ -36,61 +75,24 @@ func (c *Consumer) Consume(p processor.Processor) error {
 
 	defer c.Connection.Close()
 
-	closeErr := make(chan *amqp.Error)
-	closeErr = c.Connection.NotifyClose(closeErr)
-
-	go ConnectionCloseHandler(closeErr, c)
-
-	forever := make(chan bool)
-
-	go func() {
-		for d := range msgs {
-			err := p.Process(delivery.New(d))
-			if err == nil {
-				continue
-			}
-
-			switch err.(type) {
-			case *processor.CreateCommandError:
-				c.Log.Error(err)
-
-			case *processor.AcknowledgmentError:
-				c.Log.Error(err)
-				c.Connection.Close()
-				os.Exit(11)
-			}
-		}
-	}()
+	go ConnectionCloseHandler(c.Channel.NotifyClose(make(chan *amqp.Error)), c)
 
 	c.Log.Info("Waiting for messages...")
-	<-forever
+
+	for d := range msgs {
+		err := p.Process(delivery.New(d))
+		if err == nil {
+			continue
+		}
+
+		switch err.(type) {
+		case *processor.CreateCommandError:
+			c.Log.Error(err)
+
+		default:
+			return err
+		}
+	}
 
 	return nil
-}
-
-// New returns a initialized consumer based on config
-func New(cfg *config.Config, l logr.Logger) (*Consumer, error) {
-	conn, err := NewConnection(cfg, l)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := conn.Setup(); err != nil {
-		return nil, err
-	}
-
-	return &Consumer{
-		Connection: conn,
-		Log:        l,
-	}, nil
-}
-
-type Channel interface {
-	io.Closer
-	ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error
-	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
-	Qos(prefetchCount, prefetchSize int, global bool) error
-	QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error
-	Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error)
-	Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
 }

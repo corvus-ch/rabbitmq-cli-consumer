@@ -107,12 +107,20 @@ func Action(c *cli.Context) error {
 	ack := acknowledger.NewFromConfig(cfg)
 	p := processor.New(builder, ack, l)
 
-	client, err := consumer.New(cfg, l)
+	client, err := consumer.NewFromConfig(cfg, l)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Failed creating consumer: %s", err), 1)
 	}
 
-	client.Consume(p)
+	if err := client.Consume(p); err != nil {
+		switch err.(type) {
+		case *processor.AcknowledgmentError:
+			return cli.NewExitError(err, 11)
+
+		default:
+			return err
+		}
+	}
 
 	return nil
 }

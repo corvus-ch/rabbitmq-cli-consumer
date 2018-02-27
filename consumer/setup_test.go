@@ -1,4 +1,4 @@
-package consumer
+package consumer_test
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -209,65 +209,10 @@ func TestQueueSettings(t *testing.T) {
 	for _, test := range queueTests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg, _ := config.LoadAndParse(fmt.Sprintf("fixtures/%s.conf", test.config))
-
 			ch := new(TestChannel)
-
 			test.setup(ch)
-
-			conn := &rabbitMqConnection{
-				cfg: cfg,
-				ch:  ch,
-				log: log.New(0),
-			}
-
-			assert.Equal(t, test.err, conn.Setup())
+			assert.Equal(t, test.err, consumer.Setup(cfg, ch, log.New(0)))
 			ch.AssertExpectations(t)
 		})
 	}
-}
-
-type TestChannel struct {
-	mock.Mock
-}
-
-func (t *TestChannel) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
-	argsT := t.Called(name, kind, durable, autoDelete, internal, noWait, args)
-
-	return argsT.Error(0)
-}
-
-func (t *TestChannel) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {
-	argsT := t.Called(name, durable, autoDelete, exclusive, noWait, args)
-
-	return argsT.Get(0).(amqp.Queue), argsT.Error(1)
-}
-
-func (t *TestChannel) Qos(prefetchCount, prefetchSize int, global bool) error {
-	argsT := t.Called(prefetchCount, prefetchSize, global)
-
-	return argsT.Error(0)
-}
-
-func (t *TestChannel) QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error {
-	argsT := t.Called(name, key, exchange, noWait, args)
-
-	return argsT.Error(0)
-}
-
-func (t *TestChannel) Close() error {
-	argsT := t.Called()
-
-	return argsT.Error(0)
-}
-
-func (t *TestChannel) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
-	argsT := t.Called(queue, consumer, autoAck, exclusive, noLocal, noWait, args)
-
-	return argsT.Get(0).(<-chan amqp.Delivery), argsT.Error(0)
-}
-
-func (t *TestChannel) Publish(exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error {
-	argsT := t.Called(exchange, key, mandatory, immediate, msg)
-
-	return argsT.Error(0)
 }
