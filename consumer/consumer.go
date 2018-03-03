@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
@@ -15,25 +16,26 @@ type Consumer struct {
 	Channel    Channel
 	Queue      string
 	Tag        string
+	Processor  processor.Processor
 	Log        logr.Logger
-	canceled   bool
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
 // calling code.
-func New(conn Connection, ch Channel, queue, tag string, l logr.Logger) *Consumer {
+func New(conn Connection, ch Channel, queue, tag string, p processor.Processor, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
 		Channel:    ch,
 		Queue:      queue,
 		Tag:        tag,
+		Processor:  p,
 		Log:        l,
 	}
 }
 
 // NewFromConfig creates a new consumer instance. The setup of the amqp connection and channel is done according to the
 // configuration.
-func NewFromConfig(cfg *config.Config, l logr.Logger) (*Consumer, error) {
+func NewFromConfig(cfg *config.Config, p processor.Processor, l logr.Logger) (*Consumer, error) {
 	l.Info("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -55,12 +57,13 @@ func NewFromConfig(cfg *config.Config, l logr.Logger) (*Consumer, error) {
 		Channel:    ch,
 		Queue:      cfg.RabbitMq.Queue,
 		Tag:        cfg.ConsumerTag(),
+		Processor:  p,
 		Log:        l,
 	}, nil
 }
 
 // Consume subscribes itself to the message queue and starts consuming messages.
-func (c *Consumer) Consume(p processor.Processor) error {
+func (c *Consumer) Consume(ctx context.Context) error {
 	c.Log.Info("Registering consumer... ")
 	msgs, err := c.Channel.Consume(c.Queue, c.Tag, false, false, false, false, nil)
 	if err != nil {
@@ -70,37 +73,34 @@ func (c *Consumer) Consume(p processor.Processor) error {
 	c.Log.Info("Succeeded registering consumer.")
 	c.Log.Info("Waiting for messages...")
 
-	for d := range msgs {
-		if c.canceled {
-			if err := d.Reject(true); err != nil {
-				return err
-			}
-			continue
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			return c.Channel.Cancel(c.Tag, false)
 
-		if err := p.Process(delivery.New(d)); err != nil {
-			switch err.(type) {
-			case *processor.CreateCommandError:
-				c.Log.Error(err)
-
-			default:
-				return err
+		default:
+			select {
+			case d, ok := <-msgs:
+				if !ok {
+					return nil
+				}
+				if err := c.checkError(c.Processor.Process(delivery.New(d))); err != nil {
+					return err
+				}
 			}
 		}
 	}
-
-	return nil
 }
 
-// Cancel stops new messages from being consumed.
-//
-// All messages already received will still be processed.
-func (c *Consumer) Cancel() error {
-	err := c.Channel.Cancel(c.Tag, false)
-	if err == nil {
-		c.canceled = true
+func (c *Consumer) checkError(err error) error {
+	switch err.(type) {
+	case *processor.CreateCommandError:
+		c.Log.Error(err)
+		return nil
+
+	default:
+		return err
 	}
-	return err
 }
 
 // Close tears the connection down, taking the channel with it.
@@ -123,7 +123,6 @@ func (c *Consumer) NotifyClose(receiver chan error) chan error {
 			for {
 				err, ok := <-realChan
 				if !ok {
-					close(realChan)
 					return
 				}
 				receiver <- err

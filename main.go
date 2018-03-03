@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	stdlog "log"
 	"os"
@@ -109,23 +110,20 @@ func Action(c *cli.Context) error {
 	ack := acknowledger.NewFromConfig(cfg)
 	p := processor.New(builder, ack, l)
 
-	client, err := consumer.NewFromConfig(cfg, l)
+	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	done := make(chan bool)
+	done := make(chan error)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	failure := make(chan error)
+
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		err := client.Consume(p)
-		if err != nil {
-			failure <- err
-		}
-		done <- true
+		done <- client.Consume(ctx)
 	}()
 
 	for {
@@ -135,14 +133,10 @@ func Action(c *cli.Context) error {
 
 		case s := <-sig:
 			l.Infof("Consumer stopped with signal: %v", s)
-			if err := client.Cancel(); err != nil {
-				return fmt.Errorf("failed to cancel consumption of messages")
-			}
+			cancel()
 			l.Info("Waiting for processors to finish…")
-			<-done
-			return nil
 
-		case err := <-failure:
+		case err := <-done:
 			return checkConsumeError(err)
 		}
 	}
