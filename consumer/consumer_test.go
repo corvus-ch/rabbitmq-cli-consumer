@@ -225,3 +225,17 @@ func TestConsumer_Cancel(t *testing.T) {
 	)
 	t.Run(ct.Name, ct.Run)
 }
+
+func TestConsumer_NotifyClose(t *testing.T) {
+	err := amqp.ErrClosed
+	done := make(chan error)
+	var realChan chan *amqp.Error
+	ch := new(TestChannel)
+	ch.On("NotifyClose", mock.Anything).Return(done).Run(func(args mock.Arguments) {
+		realChan = args.Get(0).(chan *amqp.Error)
+	})
+	c := consumer.New(nil, ch, nil, log.New(0))
+	assert.Equal(t, done, c.NotifyClose(done))
+	realChan <- err
+	assert.Equal(t, err, <-done)
+}
