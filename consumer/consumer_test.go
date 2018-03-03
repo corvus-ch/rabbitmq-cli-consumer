@@ -33,7 +33,11 @@ type consumeTest struct {
 	cancelCount int
 }
 
-func NewConsumeTest(name, output string, count uint64, cancelCount int, setup setupFunc) *consumeTest {
+func newSimpleConsumetst(name, output string, setup setupFunc) *consumeTest {
+	return newConsumeTest(name, output, 1, intMax, setup)
+}
+
+func newConsumeTest(name, output string, count uint64, cancelCount int, setup setupFunc) *consumeTest {
 	dd := make([]amqp.Delivery, count)
 	for i := uint64(0); i < count; i++ {
 		dd[i] = amqp.Delivery{DeliveryTag: i}
@@ -57,7 +61,9 @@ func NewConsumeTest(name, output string, count uint64, cancelCount int, setup se
 func (ct *consumeTest) Run(t *testing.T) {
 	exp := ct.Setup(t, ct)
 	l := log.New(0)
-	c := consumer.New(nil, ct.ch, t.Name(), ct.Tag, ct.p, l)
+	c := consumer.New(nil, ct.ch, ct.p, l)
+	c.Queue = t.Name()
+	c.Tag = ct.Tag
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		ct.done <- c.Consume(ctx)
@@ -85,7 +91,7 @@ func (ct *consumeTest) produce(cancel func()) {
 }
 
 var consumeTests = []*consumeTest{
-	NewConsumeTest(
+	newConsumeTest(
 		"happy path",
 		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
 		3,
@@ -100,11 +106,9 @@ var consumeTests = []*consumeTest{
 			return nil
 		},
 	),
-	NewConsumeTest(
+	newSimpleConsumetst(
 		"consume error",
 		"INFO Registering consumer... \n",
-		1,
-		intMax,
 		func(t *testing.T, ct *consumeTest) error {
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
@@ -112,11 +116,9 @@ var consumeTests = []*consumeTest{
 			return fmt.Errorf("failed to register a consumer: consume error")
 		},
 	),
-	NewConsumeTest(
+	newSimpleConsumetst(
 		"process error",
 		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
-		1,
-		intMax,
 		func(t *testing.T, ct *consumeTest) error {
 			err := fmt.Errorf("process error")
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
@@ -126,11 +128,9 @@ var consumeTests = []*consumeTest{
 			return err
 		},
 	),
-	NewConsumeTest(
+	newSimpleConsumetst(
 		"create command error",
 		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\nERROR failed to register a consumer: create command error\n",
-		1,
-		intMax,
 		func(t *testing.T, ct *consumeTest) error {
 			err := processor.NewCreateCommandError(fmt.Errorf("create command error"))
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
@@ -140,11 +140,9 @@ var consumeTests = []*consumeTest{
 			return nil
 		},
 	),
-	NewConsumeTest(
+	newSimpleConsumetst(
 		"ack error",
 		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
-		1,
-		intMax,
 		func(t *testing.T, ct *consumeTest) error {
 			err := processor.NewAcknowledgmentError(fmt.Errorf("ack error"))
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
@@ -164,13 +162,13 @@ func TestConsumer_Consume(t *testing.T) {
 
 func TestConsumer_Close(t *testing.T) {
 	t.Run("no connection", func(t *testing.T) {
-		c := consumer.New(nil, nil, "", "", nil, log.New(0))
+		c := consumer.New(nil, nil, nil, log.New(0))
 		assert.Nil(t, c.Close())
 	})
 	t.Run("with connection", func(t *testing.T) {
 		conn := new(TestConnection)
 		conn.On("Close").Once().Return(nil)
-		c := consumer.New(conn, nil, "", "", nil, log.New(0))
+		c := consumer.New(conn, nil, nil, log.New(0))
 		assert.Nil(t, c.Close())
 		conn.AssertExpectations(t)
 	})
@@ -178,7 +176,7 @@ func TestConsumer_Close(t *testing.T) {
 		err := fmt.Errorf("close error")
 		conn := new(TestConnection)
 		conn.On("Close").Once().Return(err)
-		c := consumer.New(conn, nil, "", "", nil, log.New(0))
+		c := consumer.New(conn, nil, nil, log.New(0))
 		assert.Equal(t, err, c.Close())
 		conn.AssertExpectations(t)
 	})
@@ -190,7 +188,9 @@ func testConsumerCancel(t *testing.T, err error) {
 	ch.On("Consume", "queue", t.Name(), false, false, false, false, nilAmqpTable).Once().Return(make(chan *amqp.Delivery), nil)
 	ch.On("Cancel", t.Name(), false).Once().Return(err)
 	ctx, cancel := context.WithCancel(context.Background())
-	c := consumer.New(nil, ch, "queue", t.Name(), nil, log.New(0))
+	c := consumer.New(nil, ch, nil, log.New(0))
+	c.Queue = "queue"
+	c.Tag = t.Name()
 	go func() {
 		done <- c.Consume(ctx)
 	}()
@@ -206,7 +206,7 @@ func TestConsumer_Cancel(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		testConsumerCancel(t, fmt.Errorf("cancel error"))
 	})
-	ct := NewConsumeTest(
+	ct := newConsumeTest(
 		"skip remaining",
 		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
 		3,

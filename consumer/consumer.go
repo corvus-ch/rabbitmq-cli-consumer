@@ -22,12 +22,10 @@ type Consumer struct {
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
 // calling code.
-func New(conn Connection, ch Channel, queue, tag string, p processor.Processor, l logr.Logger) *Consumer {
+func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
 		Channel:    ch,
-		Queue:      queue,
-		Tag:        tag,
 		Processor:  p,
 		Log:        l,
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/thockin/logr"
 )
 
 var (
@@ -116,11 +117,16 @@ func Action(c *cli.Context) error {
 	}
 	defer client.Close()
 
+	return consume(client, l)
+}
+
+func consume(client *consumer.Consumer, l logr.Logger) error {
 	done := make(chan error)
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	go func() {
 		done <- client.Consume(ctx)
