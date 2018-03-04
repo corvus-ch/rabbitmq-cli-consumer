@@ -18,6 +18,7 @@ type Consumer struct {
 	Tag        string
 	Processor  processor.Processor
 	Log        logr.Logger
+	canceled   bool
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
@@ -71,23 +72,36 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	c.Log.Info("Succeeded registering consumer.")
 	c.Log.Info("Waiting for messages...")
 
-	for {
-		select {
-		case <-ctx.Done():
-			return c.Channel.Cancel(c.Tag, false)
+	done := make(chan error)
+	go c.consume(msgs, done)
 
-		default:
-			select {
-			case d, ok := <-msgs:
-				if !ok {
-					return nil
-				}
-				if err := c.checkError(c.Processor.Process(delivery.New(d))); err != nil {
-					return err
-				}
-			}
+	select {
+	case <-ctx.Done():
+		c.canceled = true
+		err := c.Channel.Cancel(c.Tag, false)
+		if err != nil {
+			return err
+		}
+		return <-done
+
+	case err := <-done:
+		return err
+	}
+}
+
+func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
+	for m := range msgs {
+		d := delivery.New(m)
+		if c.canceled {
+			d.Nack(true)
+			continue
+		}
+		if err := c.checkError(c.Processor.Process(d)); err != nil {
+			done <- err
+			return
 		}
 	}
+	done <- nil
 }
 
 func (c *Consumer) checkError(err error) error {
