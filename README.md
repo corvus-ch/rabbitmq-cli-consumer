@@ -96,7 +96,7 @@ configure an empty string you have to be explicit by using the value `<empty>`.
 ### Graceful shutdown
 
 The consumer handles the signal SIGTERM. When SIGTERM is received, the AMQP
-channel will be closed, preventing any new messages from being consumed. This
+channel will be canceled, preventing any new messages from being consumed. This
 allows to stop the consumer but let a currently running executable to finishing
 and acknowledgement of the message.
 
