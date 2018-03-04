@@ -93,6 +93,13 @@ configure an empty string you have to be explicit by using the value `<empty>`.
 
    rabbitmq-cli-consumer --verbose --url amqp://guest:guest@localhost --queue myqueue --executable command.php --configuration example.conf
 
+### Graceful shutdown
+
+The consumer handles the signal SIGTERM. When SIGTERM is received, the AMQP
+channel will be closed, preventing any new messages from being consumed. This
+allows to stop the consumer but let a currently running executable to finishing
+and acknowledgement of the message.
+
 ## The executable
 
 Your executable receives the message as the last argument. So consider the following:
@@ -249,7 +256,7 @@ the following.
 
 ```
 
-Change your script acording to the following example.
+Change your script according to the following example.
 
 ```php
 #!/usr/bin/env php

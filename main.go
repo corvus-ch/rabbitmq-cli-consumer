@@ -123,7 +123,7 @@ func Action(c *cli.Context) error {
 func consume(client *consumer.Consumer, l logr.Logger) error {
 	done := make(chan error)
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sig, syscall.SIGTERM)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -137,10 +137,9 @@ func consume(client *consumer.Consumer, l logr.Logger) error {
 		case err := <-client.NotifyClose(make(chan error)):
 			return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
 
-		case s := <-sig:
-			l.Infof("Consumer stopped with signal: %v", s)
+		case <-sig:
+			l.Info("Cancel consumption of messages.")
 			cancel()
-			l.Info("Waiting for processors to finish…")
 
 		case err := <-done:
 			return checkConsumeError(err)
