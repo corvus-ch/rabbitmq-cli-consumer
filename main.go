@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	stdlog "log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
@@ -12,6 +15,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/thockin/logr"
 )
 
 var (
@@ -107,12 +111,39 @@ func Action(c *cli.Context) error {
 	ack := acknowledger.NewFromConfig(cfg)
 	p := processor.New(builder, ack, l)
 
-	client, err := consumer.NewFromConfig(cfg, l)
+	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Failed creating consumer: %s", err), 1)
+		return err
 	}
+	defer client.Close()
 
-	return checkConsumeError(client.Consume(p))
+	return consume(client, l)
+}
+
+func consume(client *consumer.Consumer, l logr.Logger) error {
+	done := make(chan error)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		done <- client.Consume(ctx)
+	}()
+
+	select {
+	case err := <-client.NotifyClose(make(chan error)):
+		return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
+
+	case <-sig:
+		l.Info("Cancel consumption of messages.")
+		cancel()
+		return checkConsumeError(<-done)
+
+	case err := <-done:
+		return checkConsumeError(err)
+	}
 }
 
 func checkConsumeError(err error) error {
