@@ -132,18 +132,17 @@ func consume(client *consumer.Consumer, l logr.Logger) error {
 		done <- client.Consume(ctx)
 	}()
 
-	for {
-		select {
-		case err := <-client.NotifyClose(make(chan error)):
-			return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
+	select {
+	case err := <-client.NotifyClose(make(chan error)):
+		return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
 
-		case <-sig:
-			l.Info("Cancel consumption of messages.")
-			cancel()
+	case <-sig:
+		l.Info("Cancel consumption of messages.")
+		cancel()
+		return checkConsumeError(<-done)
 
-		case err := <-done:
-			return checkConsumeError(err)
-		}
+	case err := <-done:
+		return checkConsumeError(err)
 	}
 }
 
