@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/streadway/amqp"
@@ -34,7 +33,7 @@ func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Con
 
 // NewFromConfig creates a new consumer instance. The setup of the amqp connection and channel is done according to the
 // configuration.
-func NewFromConfig(cfg *config.Config, p processor.Processor, l logr.Logger) (*Consumer, error) {
+func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer, error) {
 	l.Info("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -54,7 +53,7 @@ func NewFromConfig(cfg *config.Config, p processor.Processor, l logr.Logger) (*C
 	return &Consumer{
 		Connection: conn,
 		Channel:    ch,
-		Queue:      cfg.RabbitMq.Queue,
+		Queue:      cfg.QueueName(),
 		Tag:        cfg.ConsumerTag(),
 		Processor:  p,
 		Log:        l,

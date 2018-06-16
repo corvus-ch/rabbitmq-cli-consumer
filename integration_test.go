@@ -14,9 +14,16 @@ import (
 
 	"github.com/sebdah/goldie"
 	"github.com/streadway/amqp"
+	"github.com/stretchr/testify/assert"
 )
 
-var command = os.Args[0] + " -test.run=TestHelperProcess -- "
+var (
+	command  = os.Args[0] + " -test.run=TestHelperProcess -- "
+	amqpArgs = amqp.Table{
+		"x-message-ttl":  int32(42),
+		"x-max-priority": int32(42),
+	}
+)
 
 var tests = []struct {
 	name string
@@ -112,14 +119,18 @@ var tests = []struct {
 	},
 }
 
-func TestEndToEnd(t *testing.T) {
-	conn := prepare(t)
-	defer conn.Close()
+var noDeclareTests = []struct {
+	name string
+	// The arguments passed to the consumer command.
+	args []string
+}{
+	{"noDeclare", []string{"-V", "-no-datetime", "-q", "noDeclare", "-e", command, "-no-declare"}},
+	{"noDeclareConfig", []string{"-V", "-no-datetime", "-q", "noDeclareConfig", "-e", command, "-c", "fixtures/no_declare.conf"}},
+}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		t.Errorf("failed to open channel: %v", err)
-	}
+func TestEndToEnd(t *testing.T) {
+	conn, ch := prepare(t)
+	defer conn.Close()
 	defer ch.Close()
 
 	for _, test := range tests {
@@ -127,18 +138,44 @@ func TestEndToEnd(t *testing.T) {
 			os.Remove("./command.log")
 			cmd, stdout, stderr := startConsumer(t, test.env, test.args...)
 			declareQueueAndPublish(t, ch, test.queue, test.msg)
-			waitMessageProcessed(t, stdout)
+			waitForOutput(t, stdout, "Processed!")
 			stopConsumer(t, cmd)
 
 			output, _ := ioutil.ReadFile("./command.log")
 			goldie.Assert(t, t.Name()+"Command", output)
-			goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
-			goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
+			assertOutput(t, stdout, stderr)
 		})
 	}
+
+	for _, test := range noDeclareTests {
+		t.Run(test.name, func(t *testing.T) {
+			declareQueue(t, ch, test.name, amqpArgs)
+
+			cmd, stdout, stderr := startConsumer(t, []string{}, test.args...)
+			waitForOutput(t, stdout, "Waiting for messages...")
+			stopConsumer(t, cmd)
+
+			assertOutput(t, stdout, stderr)
+		})
+	}
+
+	t.Run("declareError", func(t *testing.T) {
+		declareQueue(t, ch, t.Name(), amqpArgs)
+
+		cmd, _, _ := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command)
+		exitErr := cmd.Wait()
+
+		assert.NotNil(t, exitErr)
+		assert.Equal(t, "exit status 1", exitErr.Error())
+	})
 }
 
-func prepare(t *testing.T) *amqp.Connection {
+func assertOutput(t *testing.T, stdout, stderr *bytes.Buffer) {
+	goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
+	goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
+}
+
+func prepare(t *testing.T) (*amqp.Connection, *amqp.Channel) {
 	makeCmd := exec.Command("make", "build")
 	if err := makeCmd.Run(); err != nil {
 		t.Fatalf("could not build binary for: %v", err)
@@ -159,7 +196,12 @@ func prepare(t *testing.T) *amqp.Connection {
 		t.Fatalf("failed to open AMQP connection: %v", err)
 	}
 
-	return conn
+	ch, err := conn.Channel()
+	if err != nil {
+		t.Fatalf("failed to open channel: %v", err)
+	}
+
+	return conn, ch
 }
 
 func connect(url string) (*amqp.Connection, error) {
@@ -180,14 +222,18 @@ func connect(url string) (*amqp.Connection, error) {
 	}
 }
 
-func declareQueueAndPublish(t *testing.T, ch *amqp.Channel, name string, msg amqp.Publishing) {
-	q, err := ch.QueueDeclare(name, true, false, false, false, nil)
+func declareQueue(t *testing.T, ch *amqp.Channel, name string, args amqp.Table) amqp.Queue {
+	q, err := ch.QueueDeclare(name, true, false, false, false, args)
 	if err != nil {
 		t.Errorf("failed to declare queue; %v", err)
 	}
 
-	err = ch.Publish("", q.Name, false, false, msg)
-	if err != nil {
+	return q
+}
+
+func declareQueueAndPublish(t *testing.T, ch *amqp.Channel, name string, msg amqp.Publishing) {
+	q := declareQueue(t, ch, name, nil)
+	if err := ch.Publish("", q.Name, false, false, msg); nil != err {
 		t.Errorf("failed to publish message: %v", err)
 	}
 }
@@ -213,7 +259,7 @@ func stopConsumer(t *testing.T, cmd *exec.Cmd) {
 	}
 }
 
-func waitMessageProcessed(t *testing.T, buf *bytes.Buffer) {
+func waitForOutput(t *testing.T, buf *bytes.Buffer, expect string) {
 	timeout := time.After(10 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -221,11 +267,11 @@ func waitMessageProcessed(t *testing.T, buf *bytes.Buffer) {
 	for {
 		select {
 		case <-timeout:
-			t.Error("timeout while waiting for message processing")
+			t.Errorf("timeout while waiting for output \"%s\"", expect)
 			return
 
 		case <-ticker.C:
-			if strings.Contains(buf.String(), "Processed!") {
+			if strings.Contains(buf.String(), expect) {
 				return
 			}
 		}

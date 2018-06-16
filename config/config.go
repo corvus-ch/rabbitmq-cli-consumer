@@ -32,6 +32,7 @@ type Config struct {
 		DeadLetterExchange   string
 		DeadLetterRoutingKey string
 		Priority             int
+		Nodeclare            bool
 	}
 	Exchange struct {
 		Name       string
@@ -76,6 +77,16 @@ func (c *Config) AmqpUrl() string {
 	return c.RabbitMq.AmqpUrl
 }
 
+// QueueName returns the name of toe queue to bind with.
+func (c Config) QueueName() string {
+	return c.RabbitMq.Queue
+}
+
+// MustDeclareQueue return if the consumer should declare the queue or if the queue is expected to be already declared.
+func (c Config) MustDeclareQueue() bool {
+	return !c.QueueSettings.Nodeclare
+}
+
 // HasExchange checks if an exchange is configured.
 func (c Config) HasExchange() bool {
 	return c.Exchange.Name != ""
@@ -96,6 +107,16 @@ func (c Config) ExchangeType() string {
 	return c.Exchange.Type
 }
 
+// ExchangeIsDurable returns whether the exchange should be durable or not.
+func (c Config) ExchangeIsDurable() bool {
+	return c.Exchange.Durable
+}
+
+// ExchangeIsAutoDelete return whether the exchange should be auto deleted or not.
+func (c Config) ExchangeIsAutoDelete() bool {
+	return c.Exchange.Autodelete
+}
+
 // PrefetchCount returns the configured prefetch count of the QoS settings.
 func (c Config) PrefetchCount() int {
 	// Attempt to preserve BC here
@@ -104,6 +125,12 @@ func (c Config) PrefetchCount() int {
 	}
 
 	return c.Prefetch.Count
+}
+
+// PrefetchIsGlobal returns if the prefetch count is defined globally for all consumers or locally for just each single
+// consumer.
+func (c Config) PrefetchIsGlobal() bool {
+	return c.Prefetch.Global
 }
 
 // HasMessageTTL checks if a message TTL is configured.

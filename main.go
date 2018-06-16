@@ -67,6 +67,10 @@ var flags = []cli.Flag{
 		Name:  "no-datetime",
 		Usage: "prevents the output of date and time in the logs.",
 	},
+	cli.BoolFlag{
+		Name:  "no-declare",
+		Usage: "prevents the queue from being declared.",
+	},
 }
 
 func main() {
@@ -223,6 +227,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("strict-exit-code") {
 		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
+	}
+
+	if c.IsSet("no-declare") {
+		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
 	}
 
 	return cfg, nil
