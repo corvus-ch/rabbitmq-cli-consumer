@@ -82,6 +82,11 @@ func (c Config) QueueName() string {
 	return c.RabbitMq.Queue
 }
 
+// MustDeclareQueue return if the consumer should declare the queue or if the queue is expected to be already declared.
+func (c Config) MustDeclareQueue() bool {
+	return !c.QueueSettings.Nodeclare
+}
+
 // HasExchange checks if an exchange is configured.
 func (c Config) HasExchange() bool {
 	return c.Exchange.Name != ""

@@ -16,6 +16,7 @@ type Config interface {
 	HasMessageTTL() bool
 	HasPriority() bool
 	MessageTTL() int32
+	MustDeclareQueue() bool
 	PrefetchCount() int
 	PrefetchIsGlobal() bool
 	Priority() int32
