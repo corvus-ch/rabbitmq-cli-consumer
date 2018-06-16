@@ -1,13 +1,7 @@
 language: go
 
 go:
-  - 1.9
-  - tip
-
-matrix:
-  fast_finish: true
-  allow_failures:
-    - go: tip
+  - "1.10"
 
 branches:
   only:
@@ -27,10 +21,10 @@ install:
   - make install
 
 script:
-  - make test-integration
+  - TEST_ARGS="-tags=integration" make test
 
 after_script:
-  - ./cc-test-reporter sum-coverage --output - .coverage/*.json | ./cc-test-reporter upload-coverage --input -
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
 
 after_success:
   - test -n "${TRAVIS_TAG}" && curl -sL https://git.io/goreleaser | bash

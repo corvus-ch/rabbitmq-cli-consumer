@@ -11,6 +11,7 @@
 # Output of the go coverage tool
 /.coverage/
 *.out
+*.cov
 
 # Test/build helpers and test artifacts
 *.log
