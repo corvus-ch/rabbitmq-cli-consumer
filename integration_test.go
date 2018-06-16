@@ -17,7 +17,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var command = os.Args[0] + " -test.run=TestHelperProcess -- "
+var (
+	command  = os.Args[0] + " -test.run=TestHelperProcess -- "
+	amqpArgs = amqp.Table{
+		"x-message-ttl":  int32(42),
+		"x-max-priority": int32(42),
+	}
+)
 
 var tests = []struct {
 	name string
@@ -113,14 +119,18 @@ var tests = []struct {
 	},
 }
 
-func TestEndToEnd(t *testing.T) {
-	conn := prepare(t)
-	defer conn.Close()
+var noDeclareTests = []struct {
+	name string
+	// The arguments passed to the consumer command.
+	args []string
+}{
+	{"noDeclare", []string{"-V", "-no-datetime", "-q", "noDeclare", "-e", command, "-no-declare"}},
+	{"noDeclareConfig", []string{"-V", "-no-datetime", "-q", "noDeclareConfig", "-e", command, "-c", "fixtures/no_declare.conf"}},
+}
 
-	ch, err := conn.Channel()
-	if err != nil {
-		t.Errorf("failed to open channel: %v", err)
-	}
+func TestEndToEnd(t *testing.T) {
+	conn, ch := prepare(t)
+	defer conn.Close()
 	defer ch.Close()
 
 	for _, test := range tests {
@@ -133,37 +143,24 @@ func TestEndToEnd(t *testing.T) {
 
 			output, _ := ioutil.ReadFile("./command.log")
 			goldie.Assert(t, t.Name()+"Command", output)
-			goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
-			goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
+			assertOutput(t, stdout, stderr)
 		})
 	}
 
-	args := make(amqp.Table)
-	args["x-message-ttl"] = int32(42)
-	args["x-max-priority"] = int32(42)
+	for _, test := range noDeclareTests {
+		t.Run(test.name, func(t *testing.T) {
+			declareQueue(t, ch, test.name, amqpArgs)
 
-	t.Run("noDeclare", func(t *testing.T) {
-		declareQueue(t, ch, t.Name(), args)
+			cmd, stdout, stderr := startConsumer(t, []string{}, test.args...)
+			waitForOutput(t, stdout, "Waiting for messages...")
+			stopConsumer(t, cmd)
 
-		cmd, stdout, stderr := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command, "-no-declare")
-		waitForOutput(t, stdout, "Waiting for messages...")
-		stopConsumer(t, cmd)
+			assertOutput(t, stdout, stderr)
+		})
+	}
 
-		goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
-		goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
-	})
-	t.Run("noDeclareConfig", func(t *testing.T) {
-		declareQueue(t, ch, t.Name(), args)
-
-		cmd, stdout, stderr := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command, "-c", "fixtures/no_declare.conf")
-		waitForOutput(t, stdout, "Waiting for messages...")
-		stopConsumer(t, cmd)
-
-		goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
-		goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
-	})
 	t.Run("declareError", func(t *testing.T) {
-		declareQueue(t, ch, t.Name(), args)
+		declareQueue(t, ch, t.Name(), amqpArgs)
 
 		cmd, _, _ := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command)
 		exitErr := cmd.Wait()
@@ -173,7 +170,12 @@ func TestEndToEnd(t *testing.T) {
 	})
 }
 
-func prepare(t *testing.T) *amqp.Connection {
+func assertOutput(t *testing.T, stdout, stderr *bytes.Buffer) {
+	goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
+	goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
+}
+
+func prepare(t *testing.T) (*amqp.Connection, *amqp.Channel) {
 	makeCmd := exec.Command("make", "build")
 	if err := makeCmd.Run(); err != nil {
 		t.Fatalf("could not build binary for: %v", err)
@@ -194,7 +196,12 @@ func prepare(t *testing.T) *amqp.Connection {
 		t.Fatalf("failed to open AMQP connection: %v", err)
 	}
 
-	return conn
+	ch, err := conn.Channel()
+	if err != nil {
+		t.Fatalf("failed to open channel: %v", err)
+	}
+
+	return conn, ch
 }
 
 func connect(url string) (*amqp.Connection, error) {
