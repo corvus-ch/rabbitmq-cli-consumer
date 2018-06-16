@@ -152,6 +152,16 @@ func TestEndToEnd(t *testing.T) {
 		goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
 		goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
 	})
+	t.Run("noDeclareConfig", func(t *testing.T) {
+		declareQueue(t, ch, t.Name(), args)
+
+		cmd, stdout, stderr := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command, "-c", "fixtures/no_declare.conf")
+		waitForOutput(t, stdout, "Waiting for messages...")
+		stopConsumer(t, cmd)
+
+		goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
+		goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
+	})
 	t.Run("declareError", func(t *testing.T) {
 		declareQueue(t, ch, t.Name(), args)
 
