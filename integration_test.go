@@ -132,8 +132,8 @@ func TestEndToEnd(t *testing.T) {
 
 			output, _ := ioutil.ReadFile("./command.log")
 			goldie.Assert(t, t.Name()+"Command", output)
-			goldie.Assert(t, t.Name()+"Output", stdout.Bytes())
-			goldie.Assert(t, t.Name()+"Error", stderr.Bytes())
+			goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
+			goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
 		})
 	}
 }
