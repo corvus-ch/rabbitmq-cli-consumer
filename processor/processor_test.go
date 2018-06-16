@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"testing"
 
 	log "github.com/corvus-ch/logr/buffered"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/sebdah/goldie"
@@ -53,54 +53,61 @@ func TestProcessor_Run(t *testing.T) {
 	}
 }
 
-var processingTests = []struct {
-	name      string
-	ackMethod string
-	ackArgs   []interface{}
-	exit      int
-	strict    bool
-	onFailure int
-}{
-	{"ack", "Ack", []interface{}{}, 0, false, 0},
-	{"reject", "Reject", []interface{}{false}, 1, false, 3},
-	{"rejectRequeue", "Reject", []interface{}{true}, 1, false, 4},
-	{"nack", "Nack", []interface{}{false}, 1, false, 5},
-	{"nackRequeue", "Nack", []interface{}{true}, 1, false, 6},
-	{"fallback", "Nack", []interface{}{true}, 1, false, 0},
-	{"strictAck", "Ack", []interface{}{}, 0, true, 0},
-	{"strictReject", "Reject", []interface{}{false}, 3, true, 0},
-	{"strictRejectRequeue", "Reject", []interface{}{true}, 4, true, 0},
-	{"strictNack", "Nack", []interface{}{false}, 5, true, 0},
-	{"strictNackRequeue", "Nack", []interface{}{true}, 6, true, 0},
-}
+var properties = delivery.Properties{}
+var info = delivery.Info{}
 
 func TestProcessing(t *testing.T) {
-	for _, test := range processingTests {
-		t.Run(test.name, func(t *testing.T) {
-			d := new(TestDelivery)
-			b := new(TestBuilder)
-			pr := delivery.Properties{}
-			di := delivery.Info{}
-			cmd := testCommand("exit", true, fmt.Sprintf("%d", test.exit))
-			body := []byte(test.name)
-			p := &processor{
-				builder: b,
-				ack:     acknowledger.New(test.strict, test.onFailure),
-				log:     log.New(0),
-			}
+	testProcessing(t, "happyPath", func(t *testing.T, a *TestAcknowledger, b *TestBuilder, d *TestDelivery) string {
+		cmd := testCommand("exit", true, fmt.Sprintf("%d", 42))
 
-			b.On("GetCommand", pr, di, body).Return(cmd, nil)
-			d.On("Body").Return(body)
-			d.On(test.ackMethod, test.ackArgs...).Return(nil)
-			d.On("Properties").Return(pr)
-			d.On("Info").Return(di)
+		a.On("Ack", d, 42).Return(nil)
+		b.On("GetCommand", properties, info, []byte(t.Name())).Return(cmd, nil)
 
-			p.Process(d)
+		return ""
+	})
+	testProcessing(t, "GetCommandError", func(t *testing.T, a *TestAcknowledger, b *TestBuilder, d *TestDelivery) string {
+		var cmd *exec.Cmd
 
-			d.AssertExpectations(t)
-			b.AssertExpectations(t)
-		})
-	}
+		b.On("GetCommand", properties, info, []byte(t.Name())).Return(cmd, errors.New("invalid json"))
+		d.On("Nack", true).Return(nil)
+
+		return "failed to register a consumer: invalid json"
+	})
+	testProcessing(t, "AckError", func(t *testing.T, a *TestAcknowledger, b *TestBuilder, d *TestDelivery) string {
+		cmd := testCommand("exit", true, fmt.Sprintf("%d", 42))
+
+		a.On("Ack", d, 42).Return(errors.New("unexpected exit code 42"))
+		b.On("GetCommand", properties, info, []byte(t.Name())).Return(cmd, nil)
+
+		return "failed to aknowledge message: unexpected exit code 42"
+	})
+}
+
+func testProcessing(t *testing.T, name string, setup func(t *testing.T, a *TestAcknowledger, b *TestBuilder, d *TestDelivery) string) {
+	t.Run(name, func(t *testing.T) {
+		di := delivery.Info{}
+		pr := delivery.Properties{}
+		body := []byte(t.Name())
+
+		a := new(TestAcknowledger)
+		b := new(TestBuilder)
+		d := new(TestDelivery)
+		p := New(b, a, log.New(0))
+
+		d.On("Body").Return(body)
+		d.On("Properties").Return(pr)
+		d.On("Info").Return(di)
+
+		exp := setup(t, a, b, d)
+		err := p.Process(d)
+
+		if len(exp) > 0 {
+			assert.Equal(t, exp, err.Error())
+		}
+		a.AssertExpectations(t)
+		b.AssertExpectations(t)
+		d.AssertExpectations(t)
+	})
 }
 
 func testCommand(command string, capture bool, args ...string) *exec.Cmd {
@@ -238,4 +245,14 @@ func (t *TestDelivery) Info() delivery.Info {
 	argsT := t.Called()
 
 	return argsT.Get(0).(delivery.Info)
+}
+
+type TestAcknowledger struct {
+	mock.Mock
+}
+
+func (t *TestAcknowledger) Ack(d delivery.Delivery, code int) error {
+	argsT := t.Called(d, code)
+
+	return argsT.Error(0)
 }
