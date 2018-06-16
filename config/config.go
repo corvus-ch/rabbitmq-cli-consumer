@@ -32,6 +32,7 @@ type Config struct {
 		DeadLetterExchange   string
 		DeadLetterRoutingKey string
 		Priority             int
+		Nodeclare            bool
 	}
 	Exchange struct {
 		Name       string
