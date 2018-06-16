@@ -1,13 +1,7 @@
 language: go
 
 go:
-  - 1.9
-  - tip
-
-matrix:
-  fast_finish: true
-  allow_failures:
-    - go: tip
+  - "1.10"
 
 branches:
   only:
