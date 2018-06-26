@@ -3,8 +3,8 @@ package consumer
 import (
 	"fmt"
 
+	"github.com/bketelsen/logr"
 	"github.com/streadway/amqp"
-	"github.com/thockin/logr"
 )
 
 // Setup configures queues, exchanges and bindings in between according to the configuration.

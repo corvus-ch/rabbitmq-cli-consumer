@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/streadway/amqp"
-	"github.com/thockin/logr"
 )
 
 type Consumer struct {
