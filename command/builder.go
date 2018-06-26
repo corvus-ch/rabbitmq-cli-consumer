@@ -4,8 +4,8 @@ import (
 	"io"
 	"os/exec"
 
+	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
-	"github.com/thockin/logr"
 )
 
 // Builder describes the interface used to build the command to be executed for a received message.

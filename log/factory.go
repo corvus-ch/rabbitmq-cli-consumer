@@ -6,9 +6,9 @@ import (
 	stdlog "log"
 	"os"
 
+	"github.com/bketelsen/logr"
 	log "github.com/corvus-ch/logr/std"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
-	"github.com/thockin/logr"
 )
 
 // NewFromConfig crates a logger according to the given config.
