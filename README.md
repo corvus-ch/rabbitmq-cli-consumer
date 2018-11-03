@@ -82,7 +82,7 @@ Run without arguments or with `-help` switch to show the helptext:
 
 ### Configuration
 
-The file `example.com` contains all available configuration options together
+The file `example.conf` contains all available configuration options together
 with its explanation.
 
 In Go the zero value for a string is `""`. So, any values not configured in the
