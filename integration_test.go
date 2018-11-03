@@ -161,12 +161,9 @@ func TestEndToEnd(t *testing.T) {
 
 	t.Run("declareError", func(t *testing.T) {
 		declareQueue(t, ch, t.Name(), amqpArgs)
-
-		cmd, _, _ := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command)
-		exitErr := cmd.Wait()
-
-		assert.NotNil(t, exitErr)
-		assert.Equal(t, "exit status 1", exitErr.Error())
+		cmd, stdout, stderr := startConsumer(t, []string{}, "-V", "-no-datetime", "-q", t.Name(), "-e", command)
+		assert.EqualError(t, cmd.Wait(), "exit status 1")
+		assertOutput(t, stdout, stderr)
 	})
 }
 

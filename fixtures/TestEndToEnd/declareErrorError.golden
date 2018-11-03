@@ -1,0 +1,2 @@
+Queue already declared with conflicting settings. You might want to use --no-declare.
+failed to declare queue: Exception (406) Reason: "PRECONDITION_FAILED - inequivalent arg 'x-message-ttl' for queue 'TestEndToEnd/declareError' in vhost '/': received none but current is the value '42' of type 'signedint'"
