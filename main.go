@@ -73,6 +73,8 @@ var flags = []cli.Flag{
 	},
 }
 
+var ll logr.Logger
+
 func main() {
 	NewApp().Run(os.Args)
 }
@@ -105,6 +107,7 @@ func Action(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	ll = l
 
 	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
 	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), l, infW, errW)
@@ -169,7 +172,11 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	code := 1
 
 	if err.Error() != "" {
-		stdlog.Printf("%+v\n", err)
+		if ll != nil {
+			ll.Error(err)
+		} else {
+			stdlog.Printf("%+v\n", err)
+		}
 	}
 
 	if exitErr, ok := err.(cli.ExitCoder); ok {

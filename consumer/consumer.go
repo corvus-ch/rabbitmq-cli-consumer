@@ -48,7 +48,9 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 	}
 	l.Info("Done.")
 
-	Setup(cfg, ch, l)
+	if err := Setup(cfg, ch, l); err != nil {
+		return nil, err
+	}
 
 	return &Consumer{
 		Connection: conn,
