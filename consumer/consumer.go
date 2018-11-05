@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
@@ -18,6 +19,9 @@ type Consumer struct {
 	Processor  processor.Processor
 	Log        logr.Logger
 	canceled   bool
+
+	// wg is used to ensure NotifyClose() gets handled before the consumer exits.
+	wg sync.WaitGroup
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
@@ -102,6 +106,7 @@ func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
 			return
 		}
 	}
+	c.wg.Wait()
 	done <- nil
 }
 
@@ -129,6 +134,7 @@ func (c *Consumer) Close() error {
 // The chan provided will be closed when the Channel is closed and on a Graceful close, no error will be sent.
 func (c *Consumer) NotifyClose(receiver chan error) chan error {
 	if c.Channel != nil {
+		c.wg.Add(1)
 		realChan := make(chan *amqp.Error)
 		c.Channel.NotifyClose(realChan)
 
@@ -136,6 +142,7 @@ func (c *Consumer) NotifyClose(receiver chan error) chan error {
 			for {
 				err, ok := <-realChan
 				if !ok {
+					c.wg.Done()
 					return
 				}
 				receiver <- err

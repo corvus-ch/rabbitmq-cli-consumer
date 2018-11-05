@@ -167,6 +167,36 @@ func TestEndToEnd(t *testing.T) {
 	})
 }
 
+var closeTests = []struct {
+	name      string
+	closeArgs []string
+}{
+	{"connection", []string{"exec", "-T", "rabbitmq", "/bin/bash", "-c", "until rabbitmqadmin list connections | grep -v 'No items' > /dev/null; do sleep 1; done; eval $(rabbitmqadmin list connections -f kvp); rabbitmqadmin close connection name=\"${name}\""}},
+	{"shutdown", []string{"stop"}},
+}
+
+func TestConnectionClose(t *testing.T) {
+	for _, test := range closeTests {
+		t.Run(test.name, func(t *testing.T) {
+			conn, ch := prepare(t)
+
+			args := []string{"-V", "-no-datetime", "-e", command, "-c", "fixtures/default.conf"}
+			cmd, stdout, _ := startConsumer(t, []string{}, args...)
+			waitForOutput(t, stdout, "Waiting for messages...")
+
+			conn.Close()
+			ch.Close()
+
+			stop := exec.Command("docker-compose", test.closeArgs...)
+			if err := stop.Run(); err != nil {
+				t.Fatalf("failed to close connection/shutdown server: %v", err)
+			}
+
+			assert.EqualError(t, cmd.Wait(), "exit status 10")
+		})
+	}
+}
+
 func assertOutput(t *testing.T, stdout, stderr *bytes.Buffer) {
 	goldie.Assert(t, t.Name()+"Output", bytes.Trim(stdout.Bytes(), "\x00"))
 	goldie.Assert(t, t.Name()+"Error", bytes.Trim(stderr.Bytes(), "\x00"))
