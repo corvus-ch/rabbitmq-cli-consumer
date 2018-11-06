@@ -38,14 +38,7 @@ func setupQoS(cfg Config, ch Channel, l logr.Logger) error {
 }
 
 func declareQueue(cfg Config, ch Channel, l logr.Logger) error {
-	l.Infof(
-		"Declaring queue \"%s\" with options:\nDurable: \"%s\"\nAutoDelete: \"%s\"\nExclusive: \"%s\"\nNoWait: \"%s\"",
-		cfg.QueueName(), // Queue name 
-		cfg.QueueIsDurable(), // durable
-		cfg.QueueIsAutoDelete(), // autoDelete
-		cfg.QueueIsExclusive(), // exclusive
-		cfg.QueueIsNoWait(), // noWait
-	)
+	l.Infof("Declaring queue \"%s\"...", cfg.QueueName())
 	_, err := ch.QueueDeclare(
 		cfg.QueueName(), // Queue name
 		cfg.QueueIsDurable(), // durable
