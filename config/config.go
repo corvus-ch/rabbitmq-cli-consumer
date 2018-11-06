@@ -212,7 +212,7 @@ func (c Config) QueueIsAutoDelete() bool {
 	return c.QueueSettings.AutoDelete
 }
 
-// QueueIsAutoDelete checks if queue should be declared 'noWait'
+// QueueIsNoWait checks if queue should be declared 'noWait'
 func (c Config) QueueIsNoWait() bool {
 	return c.QueueSettings.NoWait
 }

@@ -40,12 +40,12 @@ func setupQoS(cfg Config, ch Channel, l logr.Logger) error {
 func declareQueue(cfg Config, ch Channel, l logr.Logger) error {
 	l.Infof("Declaring queue \"%s\"...", cfg.QueueName())
 	_, err := ch.QueueDeclare(
-		cfg.QueueName(), // Queue name
-		cfg.QueueIsDurable(), // durable
+		cfg.QueueName(),         // Queue name
+		cfg.QueueIsDurable(),    // durable
 		cfg.QueueIsAutoDelete(), // autoDelete
-		cfg.QueueIsExclusive(), // exclusive
-		cfg.QueueIsNoWait(), // noWait
-		queueArgs(cfg), // arguments
+		cfg.QueueIsExclusive(),  // exclusive
+		cfg.QueueIsNoWait(),     // noWait
+		queueArgs(cfg),          // arguments
 	)
 	if nil != err {
 		if amqpErr, ok := err.(*amqp.Error); ok && amqpErr.Code == 406 {

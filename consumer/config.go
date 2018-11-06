@@ -26,5 +26,4 @@ type Config interface {
 	QueueIsExclusive() bool
 	QueueIsAutoDelete() bool
 	QueueIsNoWait() bool
-
 }
