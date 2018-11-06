@@ -22,4 +22,9 @@ type Config interface {
 	Priority() int32
 	QueueName() string
 	RoutingKeys() []string
+	QueueIsDurable() bool
+	QueueIsExclusive() bool
+	QueueIsAutoDelete() bool
+	QueueIsNoWait() bool
+
 }

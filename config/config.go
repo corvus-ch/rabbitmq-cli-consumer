@@ -33,6 +33,10 @@ type Config struct {
 		DeadLetterRoutingKey string
 		Priority             int
 		Nodeclare            bool
+		Durable              bool
+		Exclusive            bool
+		AutoDelete           bool
+		NoWait               bool
 	}
 	Exchange struct {
 		Name       string
@@ -192,6 +196,27 @@ func (c Config) WithDateTime() bool {
 	return !c.Logs.NoDateTime
 }
 
+// QueueIsDurable checks if queue should be declared durable.
+// Defaults to true to keep backwards compatibility
+func (c Config) QueueIsDurable() bool {
+	return c.QueueSettings.Durable
+}
+
+// QueueIsExclusive checks if queue should be declared exclusive
+func (c Config) QueueIsExclusive() bool {
+	return c.QueueSettings.Exclusive
+}
+
+// QueueIsAutoDelete checks if queue should be declared 'autoDelete'
+func (c Config) QueueIsAutoDelete() bool {
+	return c.QueueSettings.AutoDelete
+}
+
+// QueueIsAutoDelete checks if queue should be declared 'noWait'
+func (c Config) QueueIsNoWait() bool {
+	return c.QueueSettings.NoWait
+}
+
 // ConsumerTag returns the tag used to identify the consumer.
 func (c Config) ConsumerTag() string {
 	if v, set := os.LookupEnv("GO_WANT_HELPER_PROCESS"); set && v == "1" {
@@ -218,6 +243,9 @@ func LoadAndParse(location string) (*Config, error) {
 	}
 
 	cfg := Config{}
+
+	// Needed to keep backwards compatibility
+	cfg.QueueSettings.Durable = true
 	if err := gcfg.ReadFileInto(&cfg, location); err != nil {
 		return nil, err
 	}
@@ -227,6 +255,9 @@ func LoadAndParse(location string) (*Config, error) {
 
 func CreateFromString(data string) (*Config, error) {
 	cfg := &Config{}
+
+	// Needed to keep backwards compatibility
+	cfg.QueueSettings.Durable = true
 	if err := gcfg.ReadStringInto(cfg, data); err != nil {
 		return nil, err
 	}
