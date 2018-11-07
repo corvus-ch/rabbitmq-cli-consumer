@@ -23,6 +23,12 @@ const (
 	routingConfig             = "routing"
 	simpleExchangeConfig      = "exchange"
 	ttlConfig                 = "ttl"
+	autoDeleteQueue			 = "autodelete_queue"
+	durableQueue			= "durable_queue"
+	nonDurableQueue			= "non_durable_queue"
+	defaultQueueDurability			= "default_queue_durability"
+	exclusiveQueue 			= "exclusive_queue"
+	noWaitQueue				= "nowait_queue"
 )
 
 var nilAmqpTable amqp.Table
@@ -202,6 +208,66 @@ var queueTests = []struct {
 			ch.On("QueueBind", "routingQueue", "routingKey", "routingExchange", false, nilAmqpTable).Return(fmt.Errorf("queue bind error")).Once()
 		},
 		fmt.Errorf("failed to bind queue to exchange: queue bind error"),
+	},
+	// Durable queue
+	{
+		"durableQueue",
+		durableQueue,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "durableQueue", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
+	// Non durable queue
+	{
+		"nonDurableQueue",
+		nonDurableQueue,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "nonDurableQueue", false, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
+	// Default queue durability
+	{
+		"defaultQueueDurability",
+		defaultQueueDurability,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "defaultQueueDurability", true, false, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
+	// AutoDelete queue
+	{
+		"autoDeleteQueue",
+		autoDeleteQueue,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "autoDeleteQueue", true, true, false, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
+	// Exclusive queue
+	{
+		"exclusiveQueue",
+		exclusiveQueue,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "exclusiveQueue", true, false, true, false, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
+	},
+	// Nowait queue
+	{
+		"noWaitQueue",
+		noWaitQueue,
+		func(ch *TestChannel) {
+			ch.On("Qos", 3, 0, false).Return(nil).Once()
+			ch.On("QueueDeclare", "noWaitQueue", true, false, false, true, emptyAmqpTable).Return(amqp.Queue{}, nil).Once()
+		},
+		nil,
 	},
 }
 
