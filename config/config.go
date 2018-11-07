@@ -242,27 +242,32 @@ func LoadAndParse(location string) (*Config, error) {
 		location = location
 	}
 
-	cfg := Config{}
+	cfg := &Config{}
 
-	// Needed to keep backwards compatibility
-	cfg.QueueSettings.Durable = true
-	if err := gcfg.ReadFileInto(&cfg, location); err != nil {
+	SetDefaultQueueDurability(cfg)
+	
+	if err := gcfg.ReadFileInto(cfg, location); err != nil {
 		return nil, err
 	}
 
-	return &cfg, nil
+	return cfg, nil
 }
 
 func CreateFromString(data string) (*Config, error) {
 	cfg := &Config{}
 
-	// Needed to keep backwards compatibility
-	cfg.QueueSettings.Durable = true
+	SetDefaultQueueDurability(cfg)
+
 	if err := gcfg.ReadStringInto(cfg, data); err != nil {
 		return nil, err
 	}
 
 	return cfg, nil
+}
+
+// SetDefaultQueueDurability sets queue durable to true to keep backwards compatibility
+func SetDefaultQueueDurability(cfg *Config) {
+	cfg.QueueSettings.Durable = true
 }
 
 func transformToStringValue(val string) string {
