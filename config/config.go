@@ -245,7 +245,7 @@ func LoadAndParse(location string) (*Config, error) {
 	cfg := &Config{}
 
 	SetDefaultQueueDurability(cfg)
-	
+
 	if err := gcfg.ReadFileInto(cfg, location); err != nil {
 		return nil, err
 	}

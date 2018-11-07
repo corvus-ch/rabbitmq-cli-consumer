@@ -23,12 +23,12 @@ const (
 	routingConfig             = "routing"
 	simpleExchangeConfig      = "exchange"
 	ttlConfig                 = "ttl"
-	autoDeleteQueue			 = "autodelete_queue"
-	durableQueue			= "durable_queue"
-	nonDurableQueue			= "non_durable_queue"
-	defaultQueueDurability			= "default_queue_durability"
-	exclusiveQueue 			= "exclusive_queue"
-	noWaitQueue				= "nowait_queue"
+	autoDeleteQueue           = "autodelete_queue"
+	durableQueue              = "durable_queue"
+	nonDurableQueue           = "non_durable_queue"
+	defaultQueueDurability    = "default_queue_durability"
+	exclusiveQueue            = "exclusive_queue"
+	noWaitQueue               = "nowait_queue"
 )
 
 var nilAmqpTable amqp.Table
