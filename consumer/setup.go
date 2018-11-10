@@ -39,7 +39,14 @@ func setupQoS(cfg Config, ch Channel, l logr.Logger) error {
 
 func declareQueue(cfg Config, ch Channel, l logr.Logger) error {
 	l.Infof("Declaring queue \"%s\"...", cfg.QueueName())
-	_, err := ch.QueueDeclare(cfg.QueueName(), true, false, false, false, queueArgs(cfg))
+	_, err := ch.QueueDeclare(
+		cfg.QueueName(),         // Queue name
+		cfg.QueueIsDurable(),    // durable
+		cfg.QueueIsAutoDelete(), // autoDelete
+		cfg.QueueIsExclusive(),  // exclusive
+		cfg.QueueIsNoWait(),     // noWait
+		queueArgs(cfg),          // arguments
+	)
 	if nil != err {
 		if amqpErr, ok := err.(*amqp.Error); ok && amqpErr.Code == 406 {
 			l.Error("Queue already declared with conflicting settings. You might want to use --no-declare.")
