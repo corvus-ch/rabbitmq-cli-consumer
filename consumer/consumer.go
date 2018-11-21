@@ -106,7 +106,9 @@ func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
 			return
 		}
 	}
-	c.wg.Wait()
+	if !c.canceled {
+		c.wg.Wait()
+	}
 	done <- nil
 }
 
