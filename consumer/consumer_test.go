@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
@@ -35,7 +36,7 @@ func TestConsumer_Close(t *testing.T) {
 	})
 }
 
-func testConsumerCancel(t *testing.T, err error) {
+func testConsumerCancel(t *testing.T, err error, withNotify bool) {
 	done := make(chan error)
 	ch := new(TestChannel)
 	msgs := make(chan amqp.Delivery)
@@ -47,6 +48,10 @@ func testConsumerCancel(t *testing.T, err error) {
 	c := consumer.New(nil, ch, nil, log.New(0))
 	c.Queue = "queue"
 	c.Tag = t.Name()
+	if withNotify {
+		ch.On("NotifyClose", mock.Anything)
+		c.NotifyClose(make(chan error))
+	}
 	go func() {
 		done <- c.Consume(ctx)
 	}()
@@ -92,10 +97,23 @@ var cancelTests = []*consumeTest{
 
 func TestConsumer_Cancel(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		testConsumerCancel(t, nil)
+		testConsumerCancel(t, nil, false)
 	})
 	t.Run("error", func(t *testing.T) {
-		testConsumerCancel(t, fmt.Errorf("cancel error"))
+		testConsumerCancel(t, fmt.Errorf("cancel error"), false)
+	})
+	t.Run("notify no block", func(t *testing.T) {
+		ch := make(chan bool)
+		go func() {
+			testConsumerCancel(t, nil, true)
+			ch <- true
+		}()
+		select {
+		case <-ch:
+			// Intentionally left blank.
+		case <-time.After(5 * time.Second):
+			t.Error("Timeout because notify handler is blocking cancel")
+		}
 	})
 	for _, test := range cancelTests {
 		t.Run(test.Name, test.Run)
