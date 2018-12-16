@@ -36,10 +36,11 @@ func TestConsumer_Close(t *testing.T) {
 	})
 }
 
-func testConsumerCancel(t *testing.T, err error, withNotify bool) {
+func testConsumerCancel(t *testing.T, err error) {
 	done := make(chan error)
 	ch := new(TestChannel)
 	msgs := make(chan amqp.Delivery)
+	ch.On("NotifyClose", mock.Anything).Return(nil)
 	ch.On("Consume", "queue", t.Name(), false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 	ch.On("Cancel", t.Name(), false).Once().Return(err).Run(func(_ mock.Arguments) {
 		close(msgs)
@@ -48,10 +49,7 @@ func testConsumerCancel(t *testing.T, err error, withNotify bool) {
 	c := consumer.New(nil, ch, nil, log.New(0))
 	c.Queue = "queue"
 	c.Tag = t.Name()
-	if withNotify {
-		ch.On("NotifyClose", mock.Anything)
-		c.NotifyClose(make(chan error))
-	}
+	ch.On("NotifyClose", mock.Anything)
 	go func() {
 		done <- c.Consume(ctx)
 	}()
@@ -70,6 +68,7 @@ var cancelTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), ct.Tag, false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Return(nil).Run(func(_ mock.Arguments) {
 				ct.sync <- true
@@ -89,6 +88,7 @@ var cancelTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), ct.Tag, false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
 			return nil
 		},
@@ -97,15 +97,15 @@ var cancelTests = []*consumeTest{
 
 func TestConsumer_Cancel(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		testConsumerCancel(t, nil, false)
+		testConsumerCancel(t, nil)
 	})
 	t.Run("error", func(t *testing.T) {
-		testConsumerCancel(t, fmt.Errorf("cancel error"), false)
+		testConsumerCancel(t, fmt.Errorf("cancel error"))
 	})
 	t.Run("notify no block", func(t *testing.T) {
 		ch := make(chan bool)
 		go func() {
-			testConsumerCancel(t, nil, true)
+			testConsumerCancel(t, nil)
 			ch <- true
 		}()
 		select {
@@ -118,18 +118,4 @@ func TestConsumer_Cancel(t *testing.T) {
 	for _, test := range cancelTests {
 		t.Run(test.Name, test.Run)
 	}
-}
-
-func TestConsumer_NotifyClose(t *testing.T) {
-	err := amqp.ErrClosed
-	done := make(chan error)
-	var realChan chan *amqp.Error
-	ch := new(TestChannel)
-	ch.On("NotifyClose", mock.Anything).Return(done).Run(func(args mock.Arguments) {
-		realChan = args.Get(0).(chan *amqp.Error)
-	})
-	c := consumer.New(nil, ch, nil, log.New(0))
-	assert.Equal(t, done, c.NotifyClose(done))
-	realChan <- err
-	assert.Equal(t, err, <-done)
 }

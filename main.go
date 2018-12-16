@@ -6,6 +6,7 @@ import (
 	stdlog "log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/bketelsen/logr"
@@ -16,6 +17,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/streadway/amqp"
 )
 
 var (
@@ -140,9 +142,6 @@ func consume(client *consumer.Consumer, l logr.Logger) error {
 	}()
 
 	select {
-	case err := <-client.NotifyClose(make(chan error)):
-		return cli.NewExitError(fmt.Sprintf("connection closed: %v", err), 10)
-
 	case <-sig:
 		l.Info("Cancel consumption of messages.")
 		cancel()
@@ -155,6 +154,12 @@ func consume(client *consumer.Consumer, l logr.Logger) error {
 
 func checkConsumeError(err error) error {
 	switch err.(type) {
+	case *amqp.Error:
+		if strings.Contains(err.Error(), "Exception (320) Reason:") {
+			return cli.NewExitError(fmt.Sprintf("connection closed: %v", err.(*amqp.Error).Reason), 10)
+		}
+		return err
+
 	case *processor.AcknowledgmentError:
 		return cli.NewExitError(err, 11)
 

@@ -3,6 +3,7 @@ package consumer_test
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
 
@@ -109,6 +110,7 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[1])).Once().Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[2])).Once().Return(nil)
@@ -133,6 +135,7 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
@@ -145,6 +148,7 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return nil
 		},
@@ -157,6 +161,7 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
+			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
