@@ -85,10 +85,10 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	case <-ctx.Done():
 		c.canceled = true
 		err := c.Channel.Cancel(c.Tag, false)
-		if err != nil {
-			return err
+		if err == nil {
+			err = <-done
 		}
-		return <-done
+		return err
 
 	case err := <-done:
 		return err
