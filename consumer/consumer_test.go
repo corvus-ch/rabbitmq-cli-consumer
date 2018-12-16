@@ -40,7 +40,6 @@ func testConsumerCancel(t *testing.T, err error) {
 	done := make(chan error)
 	ch := new(TestChannel)
 	msgs := make(chan amqp.Delivery)
-	ch.On("NotifyClose", mock.Anything).Return(nil)
 	ch.On("Consume", "queue", t.Name(), false, false, false, false, nilAmqpTable).Once().Return(msgs, nil)
 	ch.On("Cancel", t.Name(), false).Once().Return(err).Run(func(_ mock.Arguments) {
 		close(msgs)
@@ -49,7 +48,6 @@ func testConsumerCancel(t *testing.T, err error) {
 	c := consumer.New(nil, ch, nil, log.New(0))
 	c.Queue = "queue"
 	c.Tag = t.Name()
-	ch.On("NotifyClose", mock.Anything)
 	go func() {
 		done <- c.Consume(ctx)
 	}()
@@ -68,7 +66,6 @@ var cancelTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), ct.Tag, false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Return(nil).Run(func(_ mock.Arguments) {
 				ct.sync <- true
@@ -88,7 +85,6 @@ var cancelTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), ct.Tag, false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
 			return nil
 		},

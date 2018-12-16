@@ -28,6 +28,7 @@ func (t *TestConnection) Channel() (*amqp.Channel, error) {
 type TestChannel struct {
 	consumer.Channel
 	mock.Mock
+	notifyClose chan *amqp.Error
 }
 
 func (t *TestChannel) ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error {
@@ -37,9 +38,19 @@ func (t *TestChannel) ExchangeDeclare(name, kind string, durable, autoDelete, in
 }
 
 func (t *TestChannel) NotifyClose(c chan *amqp.Error) chan *amqp.Error {
-	t.Called(c)
-
+	t.notifyClose = c
 	return c
+}
+
+func (t *TestChannel) TriggerNotifyClose(reason string) bool {
+	if t.notifyClose != nil {
+		t.notifyClose <- &amqp.Error{
+			Reason: reason,
+			Code:   320,
+		}
+		return true
+	}
+	return false
 }
 
 func (t *TestChannel) QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error) {

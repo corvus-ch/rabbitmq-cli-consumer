@@ -3,7 +3,6 @@ package consumer_test
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
 
@@ -110,7 +109,6 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[1])).Once().Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[2])).Once().Return(nil)
@@ -135,7 +133,6 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
@@ -148,7 +145,6 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return nil
 		},
@@ -161,7 +157,6 @@ var consumeTests = []*consumeTest{
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.ch.On("NotifyClose", mock.Anything).Return(nil)
 			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
@@ -172,4 +167,32 @@ func TestConsumer_Consume(t *testing.T) {
 	for _, test := range consumeTests {
 		t.Run(test.Name, test.Run)
 	}
+}
+
+func TestConsumer_Consume_NotifyClose(t *testing.T) {
+	ch := new(TestChannel)
+	d := make(chan amqp.Delivery)
+	done := make(chan error)
+	l := log.New(0)
+
+	ch.On("Consume", "", "", false, false, false, false, nilAmqpTable).Once().Return(d, nil)
+
+	c := consumer.New(nil, ch, new(TestProcessor), l)
+
+	go func() {
+		done <- c.Consume(context.Background())
+	}()
+
+	retry := 5
+	for !ch.TriggerNotifyClose("server close") && retry > 0 {
+		retry--
+		if retry == 0 {
+			t.Fatal("No notify handler registered.")
+		}
+		// When called too early, the close handler is not yet registered. Try again later.
+		time.Sleep(time.Millisecond)
+	}
+
+	assert.Equal(t, &amqp.Error{Reason: "server close", Code: 320}, <-done)
+	ch.AssertExpectations(t)
 }
