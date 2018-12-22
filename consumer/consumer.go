@@ -3,8 +3,6 @@ package consumer
 import (
 	"context"
 	"fmt"
-	"sync"
-
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
@@ -19,9 +17,6 @@ type Consumer struct {
 	Processor  processor.Processor
 	Log        logr.Logger
 	canceled   bool
-
-	// wg is used to ensure NotifyClose() gets handled before the consumer exits.
-	wg sync.WaitGroup
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
@@ -77,17 +72,23 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	c.Log.Info("Succeeded registering consumer.")
 	c.Log.Info("Waiting for messages...")
 
+	remoteClose := make(chan *amqp.Error)
+	c.Channel.NotifyClose(remoteClose)
+
 	done := make(chan error)
 	go c.consume(msgs, done)
 
 	select {
+	case err := <-remoteClose:
+		return err
+
 	case <-ctx.Done():
 		c.canceled = true
 		err := c.Channel.Cancel(c.Tag, false)
-		if err != nil {
-			return err
+		if err == nil {
+			err = <-done
 		}
-		return <-done
+		return err
 
 	case err := <-done:
 		return err
@@ -106,7 +107,6 @@ func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
 			return
 		}
 	}
-	c.wg.Wait()
 	done <- nil
 }
 
@@ -127,28 +127,4 @@ func (c *Consumer) Close() error {
 		return nil
 	}
 	return c.Connection.Close()
-}
-
-// NotifyClose registers a listener for when the connection gets closed by the server.
-//
-// The chan provided will be closed when the Channel is closed and on a Graceful close, no error will be sent.
-func (c *Consumer) NotifyClose(receiver chan error) chan error {
-	if c.Channel != nil {
-		c.wg.Add(1)
-		realChan := make(chan *amqp.Error)
-		c.Channel.NotifyClose(realChan)
-
-		go func() {
-			for {
-				err, ok := <-realChan
-				if !ok {
-					c.wg.Done()
-					return
-				}
-				receiver <- err
-			}
-		}()
-	}
-
-	return receiver
 }
