@@ -1,0 +1,14 @@
+github.com/bketelsen/logr v0.0.0-20170116012416-f3d070bdd1c5 h1:k5oblHm+AdEGmDZA1NwxXjKuinRB6WsEuloKQ3i5u5g=
+github.com/bketelsen/logr v0.0.0-20170116012416-f3d070bdd1c5/go.mod h1:to4EbfYTEzdQuHxVGz1ug+d7a3bqOjR1r02gJ1Xv4z8=
+github.com/codegangsta/cli v1.20.0 h1:iX1FXEgwzd5+XN6wk5cVHOGQj6Q3Dcp20lUeS4lHNTw=
+github.com/codegangsta/cli v1.20.0/go.mod h1:/qJNoX69yVSKu5o4jLyXAENLRyk1uhi7zkbQ3slBdOA=
+github.com/codegangsta/cli v1.20.1-0.20190203184040-693af58b4d51 h1:onG4micSoSE6AwEVQcPY2Z2H28kf/SFG6URw3Vs9Nz8=
+github.com/codegangsta/cli v1.20.1-0.20190203184040-693af58b4d51/go.mod h1:/qJNoX69yVSKu5o4jLyXAENLRyk1uhi7zkbQ3slBdOA=
+github.com/corvus-ch/logr v0.0.0-20180917163152-45217966b77e h1:wL16/ZX3hdvCz4Xuz2oWSA9g4tV1N4sNFD3MYEUdDQM=
+github.com/corvus-ch/logr v0.0.0-20180917163152-45217966b77e/go.mod h1:vDjLhcz5/6EgBgZdQ5BxE5YAzHHkkfX8XLMPOBhlg2c=
+github.com/streadway/amqp v0.0.0-20190224195609-f16568b23ee6 h1:AyOf9zHp1p9orBslizUk3QhgmX6PaOoR/2FQar0C9Lw=
+github.com/streadway/amqp v0.0.0-20190224195609-f16568b23ee6/go.mod h1:1WNBiOZtZQLpVAyu0iTduoJL9hEsMloAK5XWrtW0xdY=
+gopkg.in/gcfg.v1 v1.2.3 h1:m8OOJ4ccYHnx2f4gQwpno8nAX5OGOh7RLaaz0pj3Ogs=
+gopkg.in/gcfg.v1 v1.2.3/go.mod h1:yesOnuUOFQAhST5vPY4nbZsb/huCgGGXlipJsBn0b3o=
+gopkg.in/warnings.v0 v0.1.2 h1:wFXVbFY8DY5/xOe1ECiWdKCzZlxgshcYVNkBHstARME=
+gopkg.in/warnings.v0 v0.1.2/go.mod h1:jksf8JmL6Qr/oQM2OXTHunEvvTAsrWBLb6OOjuVWRNI=
