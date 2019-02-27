@@ -10,6 +10,9 @@ import (
 )
 
 type Config struct {
+	Consumer struct {
+		Workers int
+	}
 	RabbitMq struct {
 		AmqpUrl      string
 		Host         string
@@ -129,6 +132,21 @@ func (c Config) PrefetchCount() int {
 	}
 
 	return c.Prefetch.Count
+}
+
+func (c Config) Workers() int {
+	// This is currently limited by the delivery channel.
+	// TODO: Investigate how to increase concurrency beyond prefetch count
+	// 		 --> Exception (406) Reason: "PRECONDITION_FAILED - unknown delivery tag 1"
+	if c.Consumer.Workers >= c.PrefetchCount() {
+		return c.PrefetchCount()
+	}
+
+	if c.Consumer.Workers == 0 {
+		return 1
+	}
+
+	return c.Consumer.Workers
 }
 
 // PrefetchIsGlobal returns if the prefetch count is defined globally for all consumers or locally for just each single

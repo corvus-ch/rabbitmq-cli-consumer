@@ -33,21 +33,15 @@ type processor struct {
 // Process creates a new exec command using the builder and executes the command. The message gets acknowledged
 // according to the commands exit code using the acknowledger.
 func (p *processor) Process(d delivery.Delivery) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	var err error
 
-	p.cmd, err = p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
-	defer func() {
-		p.cmd = nil
-	}()
+	cmd, err := p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
 	if err != nil {
 		d.Nack(true)
 		return NewCreateCommandError(err)
 	}
 
-	exitCode := p.run()
+	exitCode := p.run(cmd)
 
 	if err := p.ack.Ack(d, exitCode); err != nil {
 		return NewAcknowledgmentError(err)
@@ -56,18 +50,15 @@ func (p *processor) Process(d delivery.Delivery) error {
 	return nil
 }
 
-func (p *processor) run() int {
-	p.log.Info("Processing message...")
-	defer p.log.Info("Processed!")
-
+func (p *processor) run(cmd *exec.Cmd) int {
 	var out []byte
 	var err error
-	capture := p.cmd.Stdout == nil && p.cmd.Stderr == nil
+	capture := cmd.Stdout == nil && cmd.Stderr == nil
 
 	if capture {
-		out, err = p.cmd.CombinedOutput()
+		out, err = cmd.CombinedOutput()
 	} else {
-		err = p.cmd.Run()
+		err = cmd.Run()
 	}
 
 	if err != nil {
