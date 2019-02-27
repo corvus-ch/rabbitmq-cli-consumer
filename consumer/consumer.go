@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"fmt"
+
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
@@ -11,6 +12,7 @@ import (
 
 type Consumer struct {
 	Connection Connection
+	workers    int
 	Channel    Channel
 	Queue      string
 	Tag        string
@@ -24,6 +26,7 @@ type Consumer struct {
 func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
+		workers:    1,
 		Channel:    ch,
 		Processor:  p,
 		Log:        l,
@@ -53,6 +56,7 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 
 	return &Consumer{
 		Connection: conn,
+		workers:    cfg.Workers(),
 		Channel:    ch,
 		Queue:      cfg.QueueName(),
 		Tag:        cfg.ConsumerTag(),
@@ -70,13 +74,17 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	}
 
 	c.Log.Info("Succeeded registering consumer.")
+	c.Log.Infof("Processing messages with %v workers.", c.workers)
 	c.Log.Info("Waiting for messages...")
 
 	remoteClose := make(chan *amqp.Error)
 	c.Channel.NotifyClose(remoteClose)
 
 	done := make(chan error)
-	go c.consume(msgs, done)
+
+	for i := 0; i < c.workers; i++ {
+		go c.consume(i, msgs, done)
+	}
 
 	select {
 	case err := <-remoteClose:
@@ -95,17 +103,20 @@ func (c *Consumer) Consume(ctx context.Context) error {
 	}
 }
 
-func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
+func (c *Consumer) consume(worker int, msgs <-chan amqp.Delivery, done chan error) {
 	for m := range msgs {
 		d := delivery.New(m)
 		if c.canceled {
 			d.Nack(true)
 			continue
 		}
+		c.Log.Infof("[Worker %v] Processing message...", worker)
 		if err := c.checkError(c.Processor.Process(d)); err != nil {
+			c.Log.Infof("[Worker %v] Error!", worker)
 			done <- err
 			return
 		}
+		c.Log.Infof("[Worker %v] Processed!", worker)
 	}
 	done <- nil
 }

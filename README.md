@@ -402,6 +402,14 @@ try {
 
 ```
 
+### Concurrency
+
+By default, messages are processed sequentially with single process being spawned.
+It's possible to process messages concurrently by configuring the consumer via config
+parameter `--worker`.
+
+**Note:** The number of concurrent workers is currently bound to the number of messages being pre-fetched.
+
 ## Contributing and license
 
 This library is licenced under [MIT](LICENSE). For information about how to

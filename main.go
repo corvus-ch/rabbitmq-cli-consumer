@@ -17,6 +17,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/streadway/amqp"
 )
 
@@ -72,6 +73,11 @@ var flags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
+	},
+	cli.IntFlag{
+		Name:  "workers, w",
+		Usage: "Set the number of concurrently processed messages.",
+		Value: 1,
 	},
 }
 
@@ -243,6 +249,11 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("no-declare") {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
+	}
+
+	if c.IsSet("workers") {
+		spew.Dump(c.Int("workers"))
+		cfg.Consumer.Workers = c.Int("workers")
 	}
 
 	return cfg, nil
