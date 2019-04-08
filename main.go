@@ -4,19 +4,24 @@ import (
 	"context"
 	"fmt"
 	stdlog "log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
 )
 
@@ -27,7 +32,7 @@ var (
 )
 
 // flags is the list of global flags known to the application.
-var flags = []cli.Flag{
+var flags []cli.Flag = []cli.Flag{
 	cli.StringFlag{
 		Name:   "url, u",
 		Usage:  "Connect with RabbitMQ using `URL`",
@@ -73,6 +78,21 @@ var flags = []cli.Flag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
 	},
+	cli.StringFlag{
+		Name:  "web.listen-address",
+		Usage: "Address on which to expose metrics and web interface.",
+		Value: ":8080",
+	},
+	cli.StringFlag{
+		Name:  "web.telemetry-path",
+		Usage: "Path under which to expose metrics.",
+		Value: "/metrics",
+	},
+	//cli.StringSliceFlag{
+	//	Name:  "web.message-duration-buckets",
+	//	Usage: "Buckets for the message duration histogram.",
+	//	Value: &cli.StringSlice{"0.005", "0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1", "2.5", "5", "10"},
+	//},
 }
 
 var ll logr.Logger
@@ -126,7 +146,42 @@ func Action(c *cli.Context) error {
 	}
 	defer client.Close()
 
+	setupPromServer(
+		c.String("web.listen-address"),
+		c.String("web.telemetry-path"),
+	)
+
 	return consume(client, l)
+}
+
+func setupPromServer(addr string, path string) {
+	srv := &http.Server{
+		Addr: addr,
+		// Good practice to set timeouts to avoid Slowloris attacks.
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+	}
+
+	prometheus.MustRegister(collector.ProcessCounter)
+	prometheus.MustRegister(collector.ProcessDuration)
+	prometheus.MustRegister(collector.MessageDuration)
+
+	http.Handle(path, promhttp.Handler())
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html>
+			 <head><title>rabbitmq-cli-consumer</title></head>
+			 <body>
+			 <h1>rabbitmq-cli-consumer</h1>
+			 <p><a href='` + path + `'>Metrics</a></p>
+			 </body>
+			 </html>`))
+	})
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			ll.Errorf("Failed to bind on %s: ", addr)
+		}
+	}()
 }
 
 func consume(client *consumer.Consumer, l logr.Logger) error {
