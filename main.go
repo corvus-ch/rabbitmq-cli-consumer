@@ -81,7 +81,7 @@ var flags []cli.Flag = []cli.Flag{
 	cli.StringFlag{
 		Name:  "web.listen-address",
 		Usage: "Address on which to expose metrics and web interface.",
-		Value: ":8080",
+		Value: ":9566",
 	},
 	cli.StringFlag{
 		Name:  "web.telemetry-path",
