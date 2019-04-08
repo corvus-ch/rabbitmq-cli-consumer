@@ -7,6 +7,7 @@ const (
 )
 
 var (
+	// ProcessCounter is a Prometheus metric describing the total number of processes executed.
 	ProcessCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
@@ -16,6 +17,7 @@ var (
 		[]string{"exit_code"},
 	)
 
+	// ProcessDuration is a Prometheus metric describing the time spent by the consumer to process the message.
 	ProcessDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
@@ -24,6 +26,7 @@ var (
 		},
 	)
 
+	// MessageDuration is a Prometheus metric describing the time spent from publishing to finished processing the message.
 	MessageDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
