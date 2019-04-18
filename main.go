@@ -78,6 +78,10 @@ var flags []cli.Flag = []cli.Flag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
 	},
+	cli.BoolFlag{
+		Name:  "metrics, m",
+		Usage: "enables metric to be exposed.",
+	},
 	cli.StringFlag{
 		Name:  "web.listen-address",
 		Usage: "Address on which to expose metrics and web interface.",
@@ -88,11 +92,6 @@ var flags []cli.Flag = []cli.Flag{
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
 	},
-	//cli.StringSliceFlag{
-	//	Name:  "web.message-duration-buckets",
-	//	Usage: "Buckets for the message duration histogram.",
-	//	Value: &cli.StringSlice{"0.005", "0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1", "2.5", "5", "10"},
-	//},
 }
 
 var ll logr.Logger
@@ -146,15 +145,17 @@ func Action(c *cli.Context) error {
 	}
 	defer client.Close()
 
-	setupPromServer(
-		c.String("web.listen-address"),
-		c.String("web.telemetry-path"),
-	)
+	if c.Bool("metrics") {
+		ll.Infof("Registering metrics server at %v", c.String("web.listen-address"))
+		setupAndServeMetrics(c.String("web.listen-address"), c.String("web.telemetry-path"))
+	} else {
+		ll.Infof("Metrics disabled.")
+	}
 
 	return consume(client, l)
 }
 
-func setupPromServer(addr string, path string) {
+func setupAndServeMetrics(addr string, path string) {
 	srv := &http.Server{
 		Addr: addr,
 		// Good practice to set timeouts to avoid Slowloris attacks.
@@ -179,7 +180,7 @@ func setupPromServer(addr string, path string) {
 	})
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
-			ll.Errorf("Failed to bind on %s: ", addr)
+			panic(err)
 		}
 	}()
 }
