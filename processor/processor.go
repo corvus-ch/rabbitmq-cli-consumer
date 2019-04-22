@@ -2,13 +2,17 @@ package processor
 
 import (
 	"os/exec"
+	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Processor describes the interface used by the consumer to process messages.
@@ -47,7 +51,14 @@ func (p *processor) Process(d delivery.Delivery) error {
 		return NewCreateCommandError(err)
 	}
 
+	start := time.Now()
 	exitCode := p.run()
+
+	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(exitCode)}).Inc()
+	collector.ProcessDuration.Observe(time.Since(start).Seconds())
+	if !d.Properties().Timestamp.IsZero() {
+		collector.MessageDuration.Observe(time.Since(d.Properties().Timestamp).Seconds())
+	}
 
 	if err := p.ack.Ack(d, exitCode); err != nil {
 		return NewAcknowledgmentError(err)

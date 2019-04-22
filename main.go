@@ -4,19 +4,24 @@ import (
 	"context"
 	"fmt"
 	stdlog "log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
 )
 
@@ -27,7 +32,7 @@ var (
 )
 
 // flags is the list of global flags known to the application.
-var flags = []cli.Flag{
+var flags []cli.Flag = []cli.Flag{
 	cli.StringFlag{
 		Name:   "url, u",
 		Usage:  "Connect with RabbitMQ using `URL`",
@@ -72,6 +77,20 @@ var flags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
+	},
+	cli.BoolFlag{
+		Name:  "metrics, m",
+		Usage: "enables metric to be exposed.",
+	},
+	cli.StringFlag{
+		Name:  "web.listen-address",
+		Usage: "Address on which to expose metrics and web interface.",
+		Value: ":9566",
+	},
+	cli.StringFlag{
+		Name:  "web.telemetry-path",
+		Usage: "Path under which to expose metrics.",
+		Value: "/metrics",
 	},
 }
 
@@ -126,7 +145,44 @@ func Action(c *cli.Context) error {
 	}
 	defer client.Close()
 
+	if c.Bool("metrics") {
+		ll.Infof("Registering metrics server at %v", c.String("web.listen-address"))
+		setupAndServeMetrics(c.String("web.listen-address"), c.String("web.telemetry-path"))
+	} else {
+		ll.Infof("Metrics disabled.")
+	}
+
 	return consume(client, l)
+}
+
+func setupAndServeMetrics(addr string, path string) {
+	srv := &http.Server{
+		Addr: addr,
+		// Good practice to set timeouts to avoid Slowloris attacks.
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+	}
+
+	prometheus.MustRegister(collector.ProcessCounter)
+	prometheus.MustRegister(collector.ProcessDuration)
+	prometheus.MustRegister(collector.MessageDuration)
+
+	http.Handle(path, promhttp.Handler())
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html>
+			 <head><title>rabbitmq-cli-consumer</title></head>
+			 <body>
+			 <h1>rabbitmq-cli-consumer</h1>
+			 <p><a href='` + path + `'>Metrics</a></p>
+			 </body>
+			 </html>`))
+	})
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			panic(err)
+		}
+	}()
 }
 
 func consume(client *consumer.Consumer, l logr.Logger) error {

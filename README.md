@@ -402,6 +402,19 @@ try {
 
 ```
 
+## Metrics
+
+Metrics are following the [Prometheus](https://prometheus.io/docs/introduction/overview/) conventions.
+They are available via HTTP endpoint (http://127.0.0.1:9566/metrics), with default port `9566` and default path `/metrics`.
+
+The following metrics are tracked:
+
+| Metric                                           | Type      | Description |
+| ------------------------------------------------ | --------- | ----------- |
+| `rabbitmq_cli_consumer_process_total`            | Counter   | The total number of processes executed. Processes are aggregated by their exit code.  |
+| `rabbitmq_cli_consumer_process_duration_seconds` | Histogram | The time spent by the consumer to process the message. |
+| `rabbitmq_cli_consumer_message_duration_seconds` | Histogram | The time spent from publishing to finished processing the message. This requires the message to have the `timestamp` header set. |
+
 ## Contributing and license
 
 This library is licenced under [MIT](LICENSE). For information about how to
