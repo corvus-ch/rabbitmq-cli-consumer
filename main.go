@@ -20,6 +20,7 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
@@ -145,17 +146,25 @@ func Action(c *cli.Context) error {
 	}
 	defer client.Close()
 
+	errs := make(chan error)
+
 	if c.Bool("metrics") {
 		ll.Infof("Registering metrics server at %v", c.String("web.listen-address"))
-		setupAndServeMetrics(c.String("web.listen-address"), c.String("web.telemetry-path"))
+		go func() {
+			errs <- setupAndServeMetrics(c.String("web.listen-address"), c.String("web.telemetry-path"))
+		}()
 	} else {
 		ll.Infof("Metrics disabled.")
 	}
 
-	return consume(client, l)
+	go func() {
+		errs <- consume(client, l)
+	}()
+
+	return <-errs
 }
 
-func setupAndServeMetrics(addr string, path string) {
+func setupAndServeMetrics(addr string, path string) error {
 	srv := &http.Server{
 		Addr: addr,
 		// Good practice to set timeouts to avoid Slowloris attacks.
@@ -178,11 +187,12 @@ func setupAndServeMetrics(addr string, path string) {
 			 </body>
 			 </html>`))
 	})
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			panic(err)
-		}
-	}()
+
+	if err := srv.ListenAndServe(); err != nil {
+		return errors.Wrap(err, "failed to serve metrics")
+	}
+
+	return nil
 }
 
 func consume(client *consumer.Consumer, l logr.Logger) error {
