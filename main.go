@@ -15,7 +15,6 @@ import (
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
@@ -247,20 +246,6 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	}
 
 	os.Exit(code)
-}
-
-// CreateBuilder creates a new empty instance of command.Builder.
-// The result must be passed to command.NewBuilder before it is ready to be used.
-// If pipe is set to true, compression and metadata are ignored.
-func CreateBuilder(pipe, compression, metadata bool) command.Builder {
-	if pipe {
-		return &command.PipeBuilder{}
-	}
-
-	return &command.ArgumentBuilder{
-		Compressed:   compression,
-		WithMetadata: metadata,
-	}
 }
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
