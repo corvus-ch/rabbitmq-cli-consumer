@@ -1,11 +1,12 @@
 package consumer
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/bketelsen/logr"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
 	"github.com/streadway/amqp"
 )
 
@@ -14,14 +15,14 @@ type Consumer struct {
 	Channel    Channel
 	Queue      string
 	Tag        string
-	Processor  processor.Processor
+	Processor  worker.Process
 	Log        logr.Logger
 	canceled   bool
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
 // calling code.
-func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Consumer {
+func New(conn Connection, ch Channel, p worker.Process, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
 		Channel:    ch,
@@ -32,7 +33,7 @@ func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Con
 
 // NewFromConfig creates a new consumer instance. The setup of the amqp connection and channel is done according to the
 // configuration.
-func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer, error) {
+func NewFromConfig(cfg Config, p worker.Process, l logr.Logger) (*Consumer, error) {
 	l.Info("Connecting RabbitMQ...")
 	conn, err := amqp.Dial(cfg.AmqpUrl())
 	if nil != err {
@@ -96,28 +97,53 @@ func (c *Consumer) Consume(ctx context.Context) error {
 }
 
 func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
+	defer func() {
+		if r := recover(); r != nil {
+			done <- fmt.Errorf("fatal error in worker: %v", r)
+		}
+	}()
+
 	for m := range msgs {
-		d := delivery.New(m)
 		if c.canceled {
-			d.Nack(true)
+			m.Reject(true)
 			continue
 		}
-		if err := c.checkError(c.Processor.Process(d)); err != nil {
-			done <- err
-			return
+
+		attr, err := newAttributes(m)
+		if err != nil {
+			m.Reject(true)
+			continue
 		}
+
+		ack, err := c.Processor(attr, bytes.NewBuffer(m.Body), c.Log)
+		acknowledge(m, ack, c.Log)
 	}
+
 	done <- nil
 }
 
-func (c *Consumer) checkError(err error) error {
-	switch err.(type) {
-	case *processor.CreateCommandError:
-		c.Log.Error(err)
-		return nil
+func acknowledge(d amqp.Delivery, ack worker.Acknowledgment, log logr.Logger) {
+	level := 1
+
+	switch ack {
+	case worker.Reject:
+		log.Info("Reject message")
+		d.Reject(false)
+		break
+
+	case worker.Requeue:
+		d.Reject(true)
+		break
 
 	default:
-		return err
+		log = log.WithField("reason", "unknown acknowledgement")
+		level = 0
+		// Intentionally fall through to next case.
+
+	case worker.Ack:
+		log.V(level).Info("Acknowledge message")
+		d.Ack(false)
+		break
 	}
 }
 
@@ -126,5 +152,6 @@ func (c *Consumer) Close() error {
 	if c.Connection == nil {
 		return nil
 	}
+	c.Log.V(1).Info("Closing AMQP connection.")
 	return c.Connection.Close()
 }

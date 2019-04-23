@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/exec"
 	stdlog "log"
 	"net/http"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
@@ -125,21 +125,14 @@ func Action(c *cli.Context) error {
 		return err
 	}
 
-	l, infW, errW, err := log.NewFromConfig(cfg)
+	l, _, _, err := log.NewFromConfig(cfg)
 	if err != nil {
 		return err
 	}
 	ll = l
 
-	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
-	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), l, infW, errW)
-	if err != nil {
-		return fmt.Errorf("failed to create command builder: %v", err)
-	}
-
-	ack := acknowledger.NewFromConfig(cfg)
-	p := processor.New(builder, ack, l)
-
+	// TODO Make reject/requeue conditions configurable.
+	p := exec.New(c.String("executable"), []int{}, c.Bool("include"), ll)
 	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
 		return err
