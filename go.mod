@@ -6,6 +6,7 @@ require (
 	github.com/bketelsen/logr v0.0.0-20170116012416-f3d070bdd1c5
 	github.com/codegangsta/cli v1.20.1-0.20190203184040-693af58b4d51
 	github.com/corvus-ch/logr v0.0.0-20180917163152-45217966b77e
+	github.com/go-logr/logr v0.1.0
 	github.com/magiconair/properties v1.8.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2
