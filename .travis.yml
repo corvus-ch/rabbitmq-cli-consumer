@@ -1,30 +1,44 @@
 language: go
 
 go:
-  - "1.10"
+  - "1.12"
 
 branches:
   only:
     - master
+    - /^version-.*$/
 
-sudo: required
+env:
+  global:
+    - GO111MODULE=on
 
-services:
-  - docker
+matrix:
+  include:
+    - os: linux
+      env: TEST_ARGS="-tags=integration"
+    - os: osx
+
+cache:
+    directories:
+      - vendor
 
 before_script:
-  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
-  - chmod +x ./cc-test-reporter
-  - ./cc-test-reporter before-build
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then chmod +x ./cc-test-reporter; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./cc-test-reporter before-build; fi
 
 install:
-  - make install
+  - make deps
 
 script:
-  - TEST_ARGS="-tags=integration" make test
+  - make test
 
 after_script:
-  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT; fi
 
-after_success:
-  - test -n "${TRAVIS_TAG}" && curl -sL https://git.io/goreleaser | bash
+deploy:
+  - provider: script
+    script: GORELEASER='curl -sL https://git.io/goreleaser | bash -s --' make release
+    on:
+      tags: true
+      condition: $TRAVIS_OS_NAME = linux
