@@ -3,6 +3,7 @@
 package exec
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"os/exec"
@@ -16,25 +17,17 @@ import (
 )
 
 type processor struct {
-	cmdName string
-	cmdArgs []string
-
+	cmdName     string
+	cmdArgs     []string
 	rejectCodes []int
-
-	errW io.Writer
-	outW io.Writer
+	capture     bool
 }
 
 func New(cmd string, rejectCodes []int, capture bool, log logr.Logger) worker.Process {
 	p := &processor{
-		cmdName: cmd,
-
+		cmdName:     cmd,
 		rejectCodes: rejectCodes,
-	}
-
-	if capture {
-		p.outW = writer_adapter.NewInfoWriter(log)
-		p.errW = writer_adapter.NewErrorWriter(log)
+		capture:     capture,
 	}
 
 	if split := strings.Split(cmd, " "); len(split) > 1 {
@@ -45,6 +38,8 @@ func New(cmd string, rejectCodes []int, capture bool, log logr.Logger) worker.Pr
 }
 
 func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.Logger) (worker.Acknowledgment, error) {
+	var b bytes.Buffer
+
 	log.Info("Processing message...")
 	defer log.Info("Processed!")
 
@@ -55,8 +50,13 @@ func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.
 
 	cmd := exec.Command(p.cmdName, p.cmdArgs...)
 	cmd.Stdin = payload
-	cmd.Stdout = p.outW
-	cmd.Stderr = p.errW
+	if p.capture {
+		cmd.Stdout = writer_adapter.NewInfoWriter(log)
+		cmd.Stderr = writer_adapter.NewErrorWriter(log)
+	} else {
+		cmd.Stdout = &b
+		cmd.Stderr = &b
+	}
 	cmd.Env = os.Environ()
 	cmd.ExtraFiles = []*os.File{r}
 
@@ -73,6 +73,12 @@ func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.
 
 	if code == 0 {
 		return worker.Ack, err
+	}
+
+	log.Info("Failed. Check error log for details.")
+	log.Errorf("Error: %s\n", err)
+	if !p.capture {
+		log.Errorf("Failed: %s", b.String())
 	}
 
 	for _, rejected := range p.rejectCodes {

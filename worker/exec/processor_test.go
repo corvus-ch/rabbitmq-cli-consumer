@@ -70,11 +70,7 @@ func testProcess(t *testing.T, cmd string, expectedAck worker.Acknowledgment, ex
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, expectedAck, ack)
-	if captured {
-		goldie.Assert(t, t.Name(), log.Buf().Bytes())
-	} else {
-		assert.Empty(t, log.Buf().Bytes())
-	}
+	goldie.Assert(t, t.Name(), log.Buf().Bytes())
 }
 
 func testCommand(command string) string {

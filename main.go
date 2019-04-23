@@ -132,7 +132,7 @@ func Action(c *cli.Context) error {
 	ll = l
 
 	// TODO Make reject/requeue conditions configurable.
-	p := exec.New(c.String("executable"), []int{}, c.Bool("include"), ll)
+	p := exec.New(c.String("executable"), []int{}, c.Bool("output"), ll)
 	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
 		return err
