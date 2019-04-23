@@ -2,8 +2,6 @@ package consumer_test
 
 import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/mock"
 )
@@ -97,19 +95,6 @@ func (t *TestChannel) Cancel(consumer string, noWait bool) error {
 	argsT := t.Called(consumer, noWait)
 
 	return argsT.Error(0)
-}
-
-type TestProcessor struct {
-	processor.Processor
-	mock.Mock
-}
-
-func (p *TestProcessor) Process(d delivery.Delivery) error {
-	return p.Called(d).Error(0)
-}
-
-func (p *TestProcessor) Cancel() error {
-	return p.Called().Error(0)
 }
 
 type TestAmqpAcknowledger struct {

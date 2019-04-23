@@ -3,12 +3,14 @@ package consumer_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
+	"github.com/bketelsen/logr"
 	log "github.com/corvus-ch/logr/buffered"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
 	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -56,10 +58,8 @@ func testConsumerCancel(t *testing.T, err error) {
 	ch.AssertExpectations(t)
 }
 
-var cancelTests = []*consumeTest{
-	newConsumeTest(
-		"skip remaining",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+var cancelTests = map[string]*consumeTest{
+	"skip remaining": newConsumeTest(
 		3,
 		1,
 		func(t *testing.T, ct *consumeTest) error {
@@ -67,18 +67,18 @@ var cancelTests = []*consumeTest{
 				Once().
 				Return(ct.msgs, nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Return(nil).Run(func(_ mock.Arguments) {
+			ct.p = func(_ worker.Attributes, _ io.Reader, _ logr.Logger) (worker.Acknowledgment, error) {
 				ct.sync <- true
 				<-ct.sync
-			})
-			ct.a.On("Nack", uint64(1), true, true).Return(nil)
-			ct.a.On("Nack", uint64(2), true, true).Return(nil)
+				return worker.Ack, nil
+			}
+			ct.a.On("Ack", uint64(0), false).Return(nil)
+			ct.a.On("Reject", uint64(1), true).Return(nil)
+			ct.a.On("Reject", uint64(2), true).Return(nil)
 			return nil
 		},
 	),
-	newConsumeTest(
-		"no messages",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+	"no messages": newConsumeTest(
 		0,
 		0,
 		func(t *testing.T, ct *consumeTest) error {
@@ -111,7 +111,7 @@ func TestConsumer_Cancel(t *testing.T) {
 			t.Error("Timeout because notify handler is blocking cancel")
 		}
 	})
-	for _, test := range cancelTests {
-		t.Run(test.Name, test.Run)
+	for name, test := range cancelTests {
+		t.Run(name, test.Run)
 	}
 }
