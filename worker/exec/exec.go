@@ -45,6 +45,9 @@ func New(cmd string, rejectCodes []int, capture bool, log logr.Logger) worker.Pr
 }
 
 func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.Logger) (worker.Acknowledgment, error) {
+	log.Info("Processing message...")
+	defer log.Info("Processed!")
+
 	r, w, err := os.Pipe()
 	if err != nil {
 		return worker.Requeue, errors.Wrap(err, "failed to create pipe")
