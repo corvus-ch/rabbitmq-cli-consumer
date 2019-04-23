@@ -1,6 +1,0 @@
-INFO Processing message...
-INFO Failed. Check error log for details.
-ERROR Error: exit status 1
-ERROR Failed: lorem
-ipsum
-INFO Processed!

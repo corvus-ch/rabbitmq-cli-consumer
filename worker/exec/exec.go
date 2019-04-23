@@ -7,13 +7,17 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/logr/writer_adapter"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type processor struct {
@@ -60,6 +64,8 @@ func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.
 	cmd.Env = os.Environ()
 	cmd.ExtraFiles = []*os.File{r}
 
+	start := time.Now()
+
 	err = cmd.Start()
 	if err != nil {
 		return worker.Requeue, errors.Wrap(err, "failed to start command")
@@ -70,6 +76,12 @@ func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.
 
 	err = cmd.Wait()
 	code := exitCode(err)
+
+	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(code)}).Inc()
+	collector.ProcessDuration.Observe(time.Since(start).Seconds())
+	if !attr.Timestamp().IsZero() {
+		collector.MessageDuration.Observe(time.Since(attr.Timestamp()).Seconds())
+	}
 
 	if code == 0 {
 		return worker.Ack, err

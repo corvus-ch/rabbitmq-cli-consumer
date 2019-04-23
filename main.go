@@ -19,7 +19,6 @@ import (
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -219,10 +218,10 @@ func checkConsumeError(err error) error {
 		}
 		return err
 
-	case *processor.AcknowledgmentError:
-		return cli.NewExitError(err, 11)
-
 	default:
+		if strings.Contains(err.Error(), "failed to acknowledge message") {
+			return cli.NewExitError(err, 11)
+		}
 		return err
 	}
 }

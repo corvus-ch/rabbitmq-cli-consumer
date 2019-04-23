@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
@@ -116,24 +117,25 @@ func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
 		}
 
 		ack, err := c.Processor(attr, bytes.NewBuffer(m.Body), c.Log)
-		acknowledge(m, ack, c.Log)
+		err = acknowledge(m, ack, c.Log)
+		if err != nil {
+			done <- errors.Wrap(err, "failed to acknowledge message")
+		}
 	}
 
 	done <- nil
 }
 
-func acknowledge(d amqp.Delivery, ack worker.Acknowledgment, log logr.Logger) {
+func acknowledge(d amqp.Delivery, ack worker.Acknowledgment, log logr.Logger) error {
 	level := 1
 
 	switch ack {
 	case worker.Reject:
 		log.Info("Reject message")
-		d.Reject(false)
-		break
+		return d.Reject(false)
 
 	case worker.Requeue:
-		d.Reject(true)
-		break
+		return d.Reject(true)
 
 	default:
 		log = log.WithField("reason", "unknown acknowledgement")
@@ -142,9 +144,10 @@ func acknowledge(d amqp.Delivery, ack worker.Acknowledgment, log logr.Logger) {
 
 	case worker.Ack:
 		log.V(level).Info("Acknowledge message")
-		d.Ack(false)
-		break
+		return d.Ack(false)
 	}
+
+	return nil
 }
 
 // Close tears the connection down, taking the channel with it.
