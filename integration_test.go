@@ -41,12 +41,6 @@ var tests = map[string]struct {
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("default")},
 		[]string{},
 	},
-	"compressed": {
-		[]string{"-V", "-no-datetime", "-e", command + "-comp", "-c", "fixtures/compressed.conf"},
-		"test",
-		amqp.Publishing{ContentType: "text/plain", Body: []byte("compressed")},
-		[]string{},
-	},
 	"output": {
 		[]string{"-V", "-no-datetime", "-o", "-e", command + "-output=-", "-c", "fixtures/default.conf"},
 		"test",
