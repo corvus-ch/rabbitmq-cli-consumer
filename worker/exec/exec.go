@@ -42,39 +42,27 @@ func New(cmd string, rejectCodes []int, capture bool, log logr.Logger) worker.Pr
 }
 
 func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.Logger) (worker.Acknowledgment, error) {
-	var b bytes.Buffer
-
 	log.Info("Processing message...")
 	defer log.Info("Processed!")
 
-	r, w, err := os.Pipe()
+	cmd, w, err := p.createCommand(payload)
 	if err != nil {
-		return worker.Requeue, errors.Wrap(err, "failed to create pipe")
+		return worker.Requeue, errors.Wrap(err, "failed to create command")
 	}
 
-	cmd := exec.Command(p.cmdName, p.cmdArgs...)
-	cmd.Stdin = payload
+	runner := p.runSilent
+
 	if p.capture {
-		cmd.Stdout = writer_adapter.NewInfoWriter(log)
-		cmd.Stderr = writer_adapter.NewErrorWriter(log)
-	} else {
-		cmd.Stdout = &b
-		cmd.Stderr = &b
+		runner = p.runOutputCaptured
 	}
-	cmd.Env = os.Environ()
-	cmd.ExtraFiles = []*os.File{r}
 
 	start := time.Now()
 
-	err = cmd.Start()
-	if err != nil {
-		return worker.Requeue, errors.Wrap(err, "failed to start command")
+	err = runner(cmd, w, attr, log)
+	if err != nil && strings.Contains(err.Error(), "failed to start command") {
+		return worker.Requeue, err
 	}
 
-	io.Copy(w, attr.JSON())
-	w.Close()
-
-	err = cmd.Wait()
 	code := exitCode(err)
 
 	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(code)}).Inc()
@@ -83,23 +71,61 @@ func (p *processor) Process(attr worker.Attributes, payload io.Reader, log logr.
 		collector.MessageDuration.Observe(time.Since(attr.Timestamp()).Seconds())
 	}
 
-	if code == 0 {
-		return worker.Ack, err
+	return p.acknowledgement(code), err
+}
+
+func (p *processor) createCommand(in io.Reader) (*exec.Cmd, io.WriteCloser, error) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
 	}
 
-	log.Info("Failed. Check error log for details.")
-	log.Errorf("Error: %s\n", err)
-	if !p.capture {
-		log.Errorf("Failed: %s", b.String())
+	cmd := exec.Command(p.cmdName, p.cmdArgs...)
+	cmd.Env = os.Environ()
+	cmd.Stdin = in
+	cmd.ExtraFiles = []*os.File{r}
+
+	return cmd, w, nil
+}
+
+func (p *processor) runOutputCaptured(cmd *exec.Cmd, w io.WriteCloser, attr worker.Attributes, log logr.Logger) error {
+	cmd.Stdout = writer_adapter.NewInfoWriter(log)
+	cmd.Stderr = writer_adapter.NewErrorWriter(log)
+
+	return p.run(cmd, w, attr, log)
+}
+
+func (p *processor) runSilent(cmd *exec.Cmd, w io.WriteCloser, attr worker.Attributes, log logr.Logger) error {
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	err := p.run(cmd, w, attr, log)
+
+	if err != nil && !strings.Contains(err.Error(), "failed to start command") {
+		log.Errorf("Failed: %s", buf.String())
 	}
 
-	for _, rejected := range p.rejectCodes {
-		if code == rejected {
-			return worker.Reject, err
-		}
+	return err
+}
+
+func (p *processor) run(cmd *exec.Cmd, w io.WriteCloser, attr worker.Attributes, log logr.Logger) error {
+	err := cmd.Start()
+	if err != nil {
+		return errors.Wrap(err, "failed to start command")
 	}
 
-	return worker.Requeue, err
+	io.Copy(w, attr.JSON())
+	w.Close()
+
+	err = cmd.Wait()
+
+	if err != nil {
+		log.Info("Failed. Check error log for details.")
+		log.Errorf("Error: %s\n", err)
+	}
+
+	return err
 }
 
 func exitCode(err error) int {
@@ -114,4 +140,18 @@ func exitCode(err error) int {
 	}
 
 	return 1
+}
+
+func (p *processor) acknowledgement(exitCode int) worker.Acknowledgment {
+	if exitCode == 0 {
+		return worker.Ack
+	}
+
+	for _, rejected := range p.rejectCodes {
+		if exitCode == rejected {
+			return worker.Reject
+		}
+	}
+
+	return worker.Requeue
 }
