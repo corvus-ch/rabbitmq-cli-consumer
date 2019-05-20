@@ -1,0 +1,5 @@
+INFO Processing message...
+INFO Failed. Check error log for details.
+ERROR Error: exit status 42
+ERROR Failed: reject
+INFO Processed!

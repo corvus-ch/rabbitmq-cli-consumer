@@ -25,8 +25,7 @@ var (
 	}
 )
 
-var tests = []struct {
-	name string
+var tests = map[string]struct {
 	// The arguments passed to the consumer command.
 	args []string
 	// The queue name
@@ -36,43 +35,31 @@ var tests = []struct {
 	// The commands environment
 	env []string
 }{
-	{
-		"default",
+	"default": {
 		[]string{"-V", "-no-datetime", "-e", command, "-c", "fixtures/default.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("default")},
 		[]string{},
 	},
-	{
-		"compressed",
-		[]string{"-V", "-no-datetime", "-e", command + "-comp", "-c", "fixtures/compressed.conf"},
-		"test",
-		amqp.Publishing{ContentType: "text/plain", Body: []byte("compressed")},
-		[]string{},
-	},
-	{
-		"output",
+	"output": {
 		[]string{"-V", "-no-datetime", "-o", "-e", command + "-output=-", "-c", "fixtures/default.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("output")},
 		[]string{},
 	},
-	{
-		"noLogs",
+	"noLogs": {
 		[]string{"-V", "-no-datetime", "-o", "-e", command + "-output=-", "-c", "fixtures/no_logs.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("noLogs")},
 		[]string{},
 	},
-	{
-		"queueName",
+	"queueName": {
 		[]string{"-V", "-no-datetime", "-q", "altTest", "-e", command, "-c", "fixtures/default.conf"},
 		"altTest",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("queueName")},
 		[]string{},
 	},
-	{
-		"properties",
+	"properties": {
 		[]string{"-V", "-no-datetime", "-i", "-e", command, "-c", "fixtures/default.conf"},
 		"test",
 		amqp.Publishing{
@@ -82,40 +69,29 @@ var tests = []struct {
 		},
 		[]string{},
 	},
-	{
-		"amqpUrl",
+	"amqpUrl": {
 		[]string{"-V", "-no-datetime", "-e", command, "-c", "fixtures/amqp_url.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("amqpUrl")},
 		[]string{},
 	},
-	{
-		"noAmqpUrl",
+	"noAmqpUrl": {
 		[]string{"-V", "-no-datetime", "-e", command, "-c", "fixtures/no_amqp_url.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("noAmqpUrl")},
 		[]string{},
 	},
-	{
-		"envAmqpUrl",
+	"envAmqpUrl": {
 		[]string{"-V", "-no-datetime", "-e", command, "-c", "fixtures/no_amqp_url.conf"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("envAmqpUrl")},
 		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
 	},
-	{
-		"envAmqpUrlNoConfig",
+	"envAmqpUrlNoConfig": {
 		[]string{"-V", "-no-datetime", "-e", command, "-q", "test"},
 		"test",
 		amqp.Publishing{ContentType: "text/plain", Body: []byte("envAmqpUrlNoConfig")},
 		[]string{"AMQP_URL=amqp://guest:guest@localhost"},
-	},
-	{
-		"pipe",
-		[]string{"-V", "-no-datetime", "-pipe", "-e", command + "-pipe", "-c", "fixtures/default.conf"},
-		"test",
-		amqp.Publishing{ContentType: "text/plain", Body: []byte("pipe")},
-		[]string{},
 	},
 }
 
@@ -133,8 +109,8 @@ func TestEndToEnd(t *testing.T) {
 	defer conn.Close()
 	defer ch.Close()
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			os.Remove("./command.log")
 			cmd, stdout, stderr := startConsumer(t, test.env, test.args...)
 			declareQueueAndPublish(t, ch, test.queue, test.msg)

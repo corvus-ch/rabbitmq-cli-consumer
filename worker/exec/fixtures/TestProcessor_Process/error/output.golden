@@ -1,4 +1,5 @@
 INFO Processing message...
+ERROR requeue
 INFO Failed. Check error log for details.
 ERROR Error: exit status 1
 INFO Processed!

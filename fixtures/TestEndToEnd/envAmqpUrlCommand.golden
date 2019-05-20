@@ -1,3 +1,3 @@
 Got executed
-ZW52QW1xcFVybA==
+{"app_id":"","consumer_tag":"ctag-./rabbitmq-cli-consumer-1","content_encoding":"","content_type":"text/plain","correlation_id":"","delivery_mode":0,"delivery_tag":1,"exchange":"","expiration":"","application_headers":null,"message_id":"","type":"","priority":0,"redelivered":false,"reply_to":"","routing_key":"test","timestamp":"0001-01-01T00:00:00Z","user_id":""}
 envAmqpUrl

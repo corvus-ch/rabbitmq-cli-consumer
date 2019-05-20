@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/exec"
 	stdlog "log"
 	"net/http"
 	"os"
@@ -13,13 +14,10 @@ import (
 
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -125,21 +123,14 @@ func Action(c *cli.Context) error {
 		return err
 	}
 
-	l, infW, errW, err := log.NewFromConfig(cfg)
+	l, _, _, err := log.NewFromConfig(cfg)
 	if err != nil {
 		return err
 	}
 	ll = l
 
-	b := CreateBuilder(c.Bool("pipe"), cfg.RabbitMq.Compression, c.Bool("include"))
-	builder, err := command.NewBuilder(b, c.String("executable"), c.Bool("output"), l, infW, errW)
-	if err != nil {
-		return fmt.Errorf("failed to create command builder: %v", err)
-	}
-
-	ack := acknowledger.NewFromConfig(cfg)
-	p := processor.New(builder, ack, l)
-
+	// TODO Make reject/requeue conditions configurable.
+	p := exec.New(c.String("executable"), []int{}, c.Bool("output"), ll)
 	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
 		return err
@@ -226,10 +217,10 @@ func checkConsumeError(err error) error {
 		}
 		return err
 
-	case *processor.AcknowledgmentError:
-		return cli.NewExitError(err, 11)
-
 	default:
+		if strings.Contains(err.Error(), "failed to acknowledge message") {
+			return cli.NewExitError(err, 11)
+		}
 		return err
 	}
 }
@@ -255,20 +246,6 @@ func ExitErrHandler(_ *cli.Context, err error) {
 	}
 
 	os.Exit(code)
-}
-
-// CreateBuilder creates a new empty instance of command.Builder.
-// The result must be passed to command.NewBuilder before it is ready to be used.
-// If pipe is set to true, compression and metadata are ignored.
-func CreateBuilder(pipe, compression, metadata bool) command.Builder {
-	if pipe {
-		return &command.PipeBuilder{}
-	}
-
-	return &command.ArgumentBuilder{
-		Compressed:   compression,
-		WithMetadata: metadata,
-	}
 }
 
 // LoadConfiguration checks the configuration flags, loads the config from file and updates the config according the flags.
