@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/exec"
 	stdlog "log"
 	"net/http"
 	"os"
@@ -11,6 +10,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/exec"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/fastcgi"
 
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
@@ -129,8 +132,18 @@ func Action(c *cli.Context) error {
 	}
 	ll = l
 
-	// TODO Make reject/requeue conditions configurable.
-	p := exec.New(c.String("executable"), []int{}, c.Bool("output"), ll)
+	var p worker.Process
+	e := c.String("executable")
+	// TODO Review condition leading to the usage of the FastCGI worker.
+	if strings.HasPrefix(e, "fcgi://") {
+		if p, err = fastcgi.New(cfg, l); err != nil {
+			return err
+		}
+	} else {
+		// TODO Make reject/requeue conditions configurable.
+		p = exec.New(e, []int{}, c.Bool("output"), ll)
+	}
+
 	client, err := consumer.NewFromConfig(cfg, p, l)
 	if err != nil {
 		return err

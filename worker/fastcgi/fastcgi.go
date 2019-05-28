@@ -2,9 +2,16 @@
 // FastCGI.
 package fastcgi
 
-import "github.com/corvus-ch/rabbitmq-cli-consumer/worker"
+import (
+	"github.com/bketelsen/logr"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
+)
 
-func New() (worker.Process, error) {
+type Config interface {
+	// TODO add functions as needed.
+}
+
+func New(cfg Config, log logr.Logger) (worker.Process, error) {
 	// TODO implement.
 	// Add parameters for logger, config etc. as needed.
 	return nil, nil
