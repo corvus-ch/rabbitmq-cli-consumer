@@ -317,9 +317,9 @@ class TestCommand extends ContainerAwareCommand
 }
 ```
 
-### Use pipes instead of arguments
+### Use pipe instead of arguments
 
-When starting the consumer with the `--pipes` option, the AMQP message will be
+When starting the consumer with the `--pipe` option, the AMQP message will be
 passed on to the executable using STDIN for the message body and fd3 for the
 metadata containing the properties and the delivery info encoded as JSON.
 
