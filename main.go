@@ -93,6 +93,11 @@ var flags []cli.Flag = []cli.Flag{
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
 	},
+	cli.StringFlag{
+		Name:  "prefetch",
+		Usage: "Number of messages to prefetch from the queue.",
+		Value: "3",
+	},
 }
 
 var ll logr.Logger
@@ -307,9 +312,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
 	}
 
-	if c.IsSet("no-declare") {
-		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
+	if c.IsSet("prefetch") {
+		cfg.Prefetch.Count = c.Int("no-declare")
 	}
+
 
 	return cfg, nil
 }
