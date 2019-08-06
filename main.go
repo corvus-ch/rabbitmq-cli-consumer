@@ -308,7 +308,7 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
 	}
 	if c.IsSet("prefetch") {
-		cfg.Prefetch.Count = c.Int("no-declare")
+		cfg.Prefetch.Count = c.Int("prefetch")
 	}
 	return cfg, nil
 }
