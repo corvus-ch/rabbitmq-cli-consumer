@@ -312,10 +312,13 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
 	}
 
+	if c.IsSet("no-declare") {
+		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
+	}
+
 	if c.IsSet("prefetch") {
 		cfg.Prefetch.Count = c.Int("no-declare")
 	}
-
 
 	return cfg, nil
 }
