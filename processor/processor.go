@@ -17,7 +17,7 @@ import (
 
 // Processor describes the interface used by the consumer to process messages.
 type Processor interface {
-	Process(delivery.Delivery) error
+	Process(int, delivery.Delivery) error
 }
 
 // New creates a new processor instance.
@@ -36,7 +36,7 @@ type processor struct {
 
 // Process creates a new exec command using the builder and executes the command. The message gets acknowledged
 // according to the commands exit code using the acknowledger.
-func (p *processor) Process(d delivery.Delivery) error {
+func (p *processor) Process(channel int, d delivery.Delivery) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -52,7 +52,7 @@ func (p *processor) Process(d delivery.Delivery) error {
 	}
 
 	start := time.Now()
-	exitCode := p.run()
+	exitCode := p.run(channel)
 
 	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(exitCode)}).Inc()
 	collector.ProcessDuration.Observe(time.Since(start).Seconds())
@@ -67,9 +67,9 @@ func (p *processor) Process(d delivery.Delivery) error {
 	return nil
 }
 
-func (p *processor) run() int {
-	p.log.Info("Processing message...")
-	defer p.log.Info("Processed!")
+func (p *processor) run(channel int) int {
+	p.log.Infof("[Channel %d] Processing message...", channel)
+	defer p.log.Infof("[Channel %d] Processed!", channel)
 
 	var out []byte
 	var err error
@@ -82,10 +82,10 @@ func (p *processor) run() int {
 	}
 
 	if err != nil {
-		p.log.Info("Failed. Check error log for details.")
-		p.log.Errorf("Error: %s\n", err)
+		p.log.Infof("[Channel %d] Failed. Check error log for details.", channel)
+		p.log.Errorf("[Channel %d] Error: %s\n", channel, err)
 		if capture {
-			p.log.Errorf("Failed: %s", string(out))
+			p.log.Errorf("[Channel %d] Failed: %s", channel, string(out))
 		}
 
 		return exitCode(err)

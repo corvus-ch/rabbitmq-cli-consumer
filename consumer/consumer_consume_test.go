@@ -64,7 +64,9 @@ func newConsumeTest(name, output string, count uint64, cancelCount int, setup se
 func (ct *consumeTest) Run(t *testing.T) {
 	exp := ct.Setup(t, ct)
 	l := log.New(0)
-	c := consumer.New(nil, ct.ch, ct.p, l)
+	cl := &consumer.ChannelList{}
+	cl.AddChannel(ct.ch)
+	c := consumer.New(nil, cl, ct.p, l)
 	c.Queue = t.Name()
 	c.Tag = ct.Tag
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,62 +104,62 @@ func (ct *consumeTest) produce(cancel func()) {
 var consumeTests = []*consumeTest{
 	newConsumeTest(
 		"happy path",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
 		3,
 		intMax,
 		func(t *testing.T, ct *consumeTest) error {
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(nil)
-			ct.p.On("Process", delivery.New(ct.dd[1])).Once().Return(nil)
-			ct.p.On("Process", delivery.New(ct.dd[2])).Once().Return(nil)
+			ct.p.On("Process", 0, delivery.New(ct.dd[0])).Once().Return(nil)
+			ct.p.On("Process", 0, delivery.New(ct.dd[1])).Once().Return(nil)
+			ct.p.On("Process", 0, delivery.New(ct.dd[2])).Once().Return(nil)
 			return nil
 		},
 	),
 	newSimpleConsumeTest(
 		"consume error",
-		"INFO Registering consumer... \n",
+		"INFO Registering channels... \n",
 		func(t *testing.T, ct *consumeTest) error {
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(nil, fmt.Errorf("consume error"))
-			return fmt.Errorf("failed to register a consumer: consume error")
+			return fmt.Errorf("failed to register a channel: consume error")
 		},
 	),
 	newSimpleConsumeTest(
 		"process error",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
 		func(t *testing.T, ct *consumeTest) error {
 			err := fmt.Errorf("process error")
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
+			ct.p.On("Process", 0, delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
 	),
 	newSimpleConsumeTest(
 		"create command error",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\nERROR failed to register a consumer: create command error\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\nERROR failed to register a consumer: create command error\n",
 		func(t *testing.T, ct *consumeTest) error {
 			err := processor.NewCreateCommandError(fmt.Errorf("create command error"))
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
+			ct.p.On("Process", 0, delivery.New(ct.dd[0])).Once().Return(err)
 			return nil
 		},
 	),
 	newSimpleConsumeTest(
 		"ack error",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
 		func(t *testing.T, ct *consumeTest) error {
 			err := processor.NewAcknowledgmentError(fmt.Errorf("ack error"))
 			ct.ch.On("Consume", t.Name(), "ctag", false, false, false, false, nilAmqpTable).
 				Once().
 				Return(ct.msgs, nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Once().Return(err)
+			ct.p.On("Process", 0, delivery.New(ct.dd[0])).Once().Return(err)
 			return err
 		},
 	),
@@ -177,7 +179,9 @@ func TestConsumer_Consume_NotifyClose(t *testing.T) {
 
 	ch.On("Consume", "", "", false, false, false, false, nilAmqpTable).Once().Return(d, nil)
 
-	c := consumer.New(nil, ch, new(TestProcessor), l)
+	cl := &consumer.ChannelList{}
+	cl.AddChannel(ch)
+	c := consumer.New(nil, cl, new(TestProcessor), l)
 
 	go func() {
 		done <- c.Consume(context.Background())

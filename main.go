@@ -79,6 +79,11 @@ var flags []cli.Flag = []cli.Flag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
 	},
+	cli.IntFlag{
+		Name:  "num-channels, n",
+		Value: 1,
+		Usage: "Specifies the number of channels to use on this connection.",
+	},
 	cli.BoolFlag{
 		Name:  "metrics, m",
 		Usage: "enables metric to be exposed.",
@@ -309,6 +314,12 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("no-declare") {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
+	}
+
+	cfg.RabbitMq.NumChannels = c.Int("num-channels")
+
+	if (cfg.RabbitMq.NumChannels < 1) {
+		cfg.RabbitMq.NumChannels = 1
 	}
 
 	return cfg, nil

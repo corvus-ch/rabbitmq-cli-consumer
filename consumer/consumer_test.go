@@ -45,21 +45,24 @@ func testConsumerCancel(t *testing.T, err error) {
 		close(msgs)
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	c := consumer.New(nil, ch, nil, log.New(0))
+	cl := &consumer.ChannelList{}
+	cl.AddChannel(ch)
+	c := consumer.New(nil, cl, nil, log.New(0))
 	c.Queue = "queue"
 	c.Tag = t.Name()
 	go func() {
 		done <- c.Consume(ctx)
 	}()
 	cancel()
-	assert.Equal(t, err, <-done)
+	cerr := <-done
+	assert.Equal(t, err, cerr)
 	ch.AssertExpectations(t)
 }
 
 var cancelTests = []*consumeTest{
 	newConsumeTest(
 		"skip remaining",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
 		3,
 		1,
 		func(t *testing.T, ct *consumeTest) error {
@@ -67,7 +70,7 @@ var cancelTests = []*consumeTest{
 				Once().
 				Return(ct.msgs, nil)
 			ct.ch.On("Cancel", ct.Tag, false).Return(nil)
-			ct.p.On("Process", delivery.New(ct.dd[0])).Return(nil).Run(func(_ mock.Arguments) {
+			ct.p.On("Process", 0, delivery.New(ct.dd[0])).Return(nil).Run(func(_ mock.Arguments) {
 				ct.sync <- true
 				<-ct.sync
 			})
@@ -78,7 +81,7 @@ var cancelTests = []*consumeTest{
 	),
 	newConsumeTest(
 		"no messages",
-		"INFO Registering consumer... \nINFO Succeeded registering consumer.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
 		0,
 		0,
 		func(t *testing.T, ct *consumeTest) error {

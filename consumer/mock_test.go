@@ -104,8 +104,8 @@ type TestProcessor struct {
 	mock.Mock
 }
 
-func (p *TestProcessor) Process(d delivery.Delivery) error {
-	return p.Called(d).Error(0)
+func (p *TestProcessor) Process(channel int, d delivery.Delivery) error {
+	return p.Called(channel, d).Error(0)
 }
 
 func (p *TestProcessor) Cancel() error {

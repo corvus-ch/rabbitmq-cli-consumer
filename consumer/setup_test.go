@@ -277,7 +277,9 @@ func TestQueueSettings(t *testing.T) {
 			cfg, _ := config.LoadAndParse(fmt.Sprintf("fixtures/%s.conf", test.config))
 			ch := new(TestChannel)
 			test.setup(ch)
-			assert.Equal(t, test.err, consumer.Setup(cfg, ch, log.New(0)))
+			cl := &consumer.ChannelList{}
+			cl.AddChannel(ch)
+			assert.Equal(t, test.err, consumer.Setup(cfg, cl, log.New(0)))
 			ch.AssertExpectations(t)
 		})
 	}

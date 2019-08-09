@@ -21,6 +21,7 @@ type Config struct {
 		Compression  bool
 		Onfailure    int
 		Stricfailure bool
+		NumChannels  int
 	}
 	Prefetch struct {
 		Count  int
@@ -215,6 +216,11 @@ func (c Config) QueueIsAutoDelete() bool {
 // QueueIsNoWait checks if queue should be declared 'noWait'
 func (c Config) QueueIsNoWait() bool {
 	return c.QueueSettings.NoWait
+}
+
+// NumChannels determines how many Channels to open on this Connection
+func (c Config) NumChannels() int {
+	return c.RabbitMq.NumChannels
 }
 
 // ConsumerTag returns the tag used to identify the consumer.

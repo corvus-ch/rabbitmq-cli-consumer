@@ -47,7 +47,7 @@ func TestProcessor_Run(t *testing.T) {
 			l := log.New(0)
 			p := processor{log: l, cmd: test.cmd}
 
-			assert.Equal(t, p.run(), test.code)
+			assert.Equal(t, p.run(1), test.code)
 			goldie.Assert(t, t.Name(), l.Buf().Bytes())
 		})
 	}
@@ -99,7 +99,7 @@ func testProcessing(t *testing.T, name string, setup func(t *testing.T, a *TestA
 		d.On("Info").Return(di)
 
 		exp := setup(t, a, b, d)
-		err := p.Process(d)
+		err := p.Process(1, d)
 
 		if len(exp) > 0 {
 			assert.Equal(t, exp, err.Error())

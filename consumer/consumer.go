@@ -11,7 +11,7 @@ import (
 
 type Consumer struct {
 	Connection Connection
-	Channel    Channel
+	Channels   *ChannelList
 	Queue      string
 	Tag        string
 	Processor  processor.Processor
@@ -21,10 +21,10 @@ type Consumer struct {
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
 // calling code.
-func New(conn Connection, ch Channel, p processor.Processor, l logr.Logger) *Consumer {
+func New(conn Connection, chs *ChannelList, p processor.Processor, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
-		Channel:    ch,
+		Channels:   chs,
 		Processor:  p,
 		Log:        l,
 	}
@@ -40,20 +40,18 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 	}
 	l.Info("Connected.")
 
-	l.Info("Opening channel...")
-	ch, err := conn.Channel()
+	cl, err := NewChannelList(conn, cfg.NumChannels(), l)
 	if nil != err {
-		return nil, fmt.Errorf("failed to open a channel: %v", err)
+		return nil, fmt.Errorf("failed creating channel(s): %v", err)
 	}
-	l.Info("Done.")
 
-	if err := Setup(cfg, ch, l); err != nil {
+	if err := Setup(cfg, cl, l); err != nil {
 		return nil, err
 	}
 
 	return &Consumer{
 		Connection: conn,
-		Channel:    ch,
+		Channels:   cl,
 		Queue:      cfg.QueueName(),
 		Tag:        cfg.ConsumerTag(),
 		Processor:  p,
@@ -63,46 +61,63 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 
 // Consume subscribes itself to the message queue and starts consuming messages.
 func (c *Consumer) Consume(ctx context.Context) error {
-	c.Log.Info("Registering consumer... ")
-	msgs, err := c.Channel.Consume(c.Queue, c.Tag, false, false, false, false, nil)
-	if err != nil {
-		return fmt.Errorf("failed to register a consumer: %s", err)
+	remoteClose := make(chan *amqp.Error)
+	done := make(chan error)
+
+	c.Log.Info("Registering channels... ")
+	for i, ch := range c.Channels.Channels() {
+		msgs, err := ch.Consume(c.Queue, c.Tag, false, false, false, false, nil)
+		if err != nil {
+			return fmt.Errorf("failed to register a channel: %s", err)
+		}
+
+		c.Log.Infof("Succeeded registering channel %d.", i)
+
+		ch.NotifyClose(remoteClose)
+
+		go c.consume(i, msgs, done)
 	}
 
-	c.Log.Info("Succeeded registering consumer.")
 	c.Log.Info("Waiting for messages...")
-
-	remoteClose := make(chan *amqp.Error)
-	c.Channel.NotifyClose(remoteClose)
-
-	done := make(chan error)
-	go c.consume(msgs, done)
 
 	select {
 	case err := <-remoteClose:
 		return err
 
 	case <-ctx.Done():
-		c.canceled = true
-		err := c.Channel.Cancel(c.Tag, false)
-		if err == nil {
-			err = <-done
-		}
-		return err
+		return c.Cancel(done)
 
 	case err := <-done:
 		return err
 	}
 }
 
-func (c *Consumer) consume(msgs <-chan amqp.Delivery, done chan error) {
+// Cancel marks the Consumer as cancelled, and then cancels all the Channels.
+func (c *Consumer) Cancel(done chan error) error {
+	c.canceled = true
+	var firstError error
+	for i, ch := range c.Channels.Channels() {
+		fmt.Printf("closing channel %d...", i)
+		err := ch.Cancel(c.Tag, false)
+		if err == nil {
+			err = <-done
+		}
+		if nil != err && nil == firstError {
+			firstError = err
+		}
+	}
+
+	return firstError
+}
+
+func (c *Consumer) consume(channel int, msgs <-chan amqp.Delivery, done chan error) {
 	for m := range msgs {
 		d := delivery.New(m)
 		if c.canceled {
 			d.Nack(true)
 			continue
 		}
-		if err := c.checkError(c.Processor.Process(d)); err != nil {
+		if err := c.checkError(c.Processor.Process(channel, d)); err != nil {
 			done <- err
 			return
 		}
