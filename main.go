@@ -316,10 +316,8 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
 	}
 
-	cfg.RabbitMq.NumChannels = c.Int("num-channels")
-
-	if (cfg.RabbitMq.NumChannels < 1) {
-		cfg.RabbitMq.NumChannels = 1
+	if c.IsSet("num-channels") {
+		cfg.RabbitMq.NumChannels = c.Int("num-channels")
 	}
 
 	return cfg, nil

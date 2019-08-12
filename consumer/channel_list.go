@@ -21,7 +21,7 @@ type ChannelList struct {
 
 // NewChannelList creates a new ChannelList with a single Channel
 func NewChannelList(conn Connection, len int, l logr.Logger) (*ChannelList, error) {
-	if (len < 1) {
+	if len < 1 {
 		return nil, fmt.Errorf("cannot create a ChannelList with less than one channel (got %d)", len)
 	}
 
