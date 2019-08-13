@@ -11,7 +11,7 @@ import (
 
 type Consumer struct {
 	Connection Connection
-	Channels   *ChannelList
+	Channels   ChannelMultiplexer
 	Queue      string
 	Tag        string
 	Processor  processor.Processor
@@ -21,10 +21,10 @@ type Consumer struct {
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
 // calling code.
-func New(conn Connection, chs *ChannelList, p processor.Processor, l logr.Logger) *Consumer {
+func New(conn Connection, cm ChannelMultiplexer, p processor.Processor, l logr.Logger) *Consumer {
 	return &Consumer{
 		Connection: conn,
-		Channels:   chs,
+		Channels:   cm,
 		Processor:  p,
 		Log:        l,
 	}

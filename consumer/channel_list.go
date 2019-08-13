@@ -9,9 +9,9 @@ import (
 
 // ChannelMultiplexer describes an object that holds multiple Channels
 type ChannelMultiplexer interface {
-	AddChannel()
+	AddChannel(Channel)
 	Channels() []Channel
-	FirstChannel() Channel
+	FirstChannel() (Channel, error)
 }
 
 // ChannelList is an implementation of the ChannelMultiplexer interface.
