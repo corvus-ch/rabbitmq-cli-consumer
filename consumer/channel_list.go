@@ -12,6 +12,7 @@ type ChannelMultiplexer interface {
 	AddChannel(Channel)
 	Channels() []Channel
 	FirstChannel() (Channel, error)
+	Qos(prefetchCount, prefetchSize int, global bool) error
 }
 
 // ChannelList is an implementation of the ChannelMultiplexer interface.
@@ -52,12 +53,20 @@ func (cl *ChannelList) Channels() []Channel {
 
 // FirstChannel is a convenience function to get the first Channel in this ChannelList.
 func (cl *ChannelList) FirstChannel() (Channel, error) {
-	var ch Channel
-	chs := cl.Channels()
-	if len(chs) < 1 {
+	if len(cl.channels) < 1 {
+		var ch Channel
 		return ch, errors.New("tried to get the first channel from an uninitialized ChannelList")
 	}
 
-	ch = cl.channels[0]
-	return ch, nil
+	return cl.channels[0], nil
+}
+
+// Qos sets Qos settings for all Channels in this ChannelList.
+func (cl *ChannelList) Qos(prefetchCount, prefetchSize int, global bool) error {
+	for i, ch := range cl.channels {
+		if err := ch.Qos(prefetchCount, prefetchSize, global); err != nil {
+			return fmt.Errorf("failed to set QoS on channel %d: %v", i, err)
+		}
+	}
+	return nil
 }

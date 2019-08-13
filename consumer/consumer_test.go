@@ -62,7 +62,7 @@ func testConsumerCancel(t *testing.T, err error) {
 var cancelTests = []*consumeTest{
 	newConsumeTest(
 		"skip remaining",
-		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\nINFO closing channel 0...\n",
 		3,
 		1,
 		func(t *testing.T, ct *consumeTest) error {
@@ -81,7 +81,7 @@ var cancelTests = []*consumeTest{
 	),
 	newConsumeTest(
 		"no messages",
-		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\n",
+		"INFO Registering channels... \nINFO Succeeded registering channel 0.\nINFO Waiting for messages...\nINFO closing channel 0...\n",
 		0,
 		0,
 		func(t *testing.T, ct *consumeTest) error {

@@ -7,16 +7,7 @@ import (
 )
 
 // Setup configures queues, exchanges and bindings in between according to the configuration.
-func Setup(cfg Config, cl *ChannelList, l logr.Logger) error {
-	if err := setupQoS(cfg, cl, l); err != nil {
-		return err
-	}
-
-	ch, err := cl.FirstChannel()
-	if nil != err {
-		return err
-	}
-
+func Setup(cfg Config, ch Channel, l logr.Logger) error {
 	if cfg.MustDeclareQueue() {
 		if err := declareQueue(cfg, ch, l); err != nil {
 			return err
@@ -30,17 +21,6 @@ func Setup(cfg Config, cl *ChannelList, l logr.Logger) error {
 		}
 	}
 
-	return nil
-}
-
-func setupQoS(cfg Config, cl *ChannelList, l logr.Logger) error {
-	l.Info("Setting QoS... ")
-	for _, ch := range cl.Channels() {
-		if err := ch.Qos(cfg.PrefetchCount(), 0, cfg.PrefetchIsGlobal()); err != nil {
-			return fmt.Errorf("failed to set QoS: %v", err)
-		}
-	}
-	l.Info("Succeeded setting QoS.")
 	return nil
 }
 

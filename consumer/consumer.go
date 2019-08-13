@@ -45,7 +45,18 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 		return nil, fmt.Errorf("failed creating channel(s): %v", err)
 	}
 
-	if err := Setup(cfg, cl, l); err != nil {
+	l.Info("Setting QoS... ")
+	if err := cl.Qos(cfg.PrefetchCount(), 0, cfg.PrefetchIsGlobal()); err != nil {
+		return nil, err
+	}
+	l.Info("Succeeded setting QoS.")
+
+	ch, err := cl.FirstChannel()
+	if nil != err {
+		return nil, err
+	}
+
+	if err := Setup(cfg, ch, l); err != nil {
 		return nil, err
 	}
 
@@ -97,7 +108,7 @@ func (c *Consumer) Cancel(done chan error) error {
 	c.canceled = true
 	var firstError error
 	for i, ch := range c.Channels.Channels() {
-		fmt.Printf("closing channel %d...", i)
+		c.Log.Infof("closing channel %d...", i)
 		err := ch.Cancel(c.Tag, false)
 		if err == nil {
 			err = <-done
