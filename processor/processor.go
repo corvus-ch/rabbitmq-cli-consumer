@@ -31,20 +31,16 @@ type processor struct {
 	ack     acknowledger.Acknowledger
 	log     logr.Logger
 	mu      sync.Mutex
-	cmd     *exec.Cmd
 }
 
 // Process creates a new exec command using the builder and executes the command. The message gets acknowledged
 // according to the commands exit code using the acknowledger.
 func (p *processor) Process(channel int, d delivery.Delivery) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	var err error
 
-	p.cmd, err = p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
+	cmd, err := p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
 	defer func() {
-		p.cmd = nil
+		cmd = nil
 	}()
 	if err != nil {
 		d.Nack(true)
@@ -52,7 +48,7 @@ func (p *processor) Process(channel int, d delivery.Delivery) error {
 	}
 
 	start := time.Now()
-	exitCode := p.run(channel)
+	exitCode := p.run(cmd, channel)
 
 	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(exitCode)}).Inc()
 	collector.ProcessDuration.Observe(time.Since(start).Seconds())
@@ -67,18 +63,18 @@ func (p *processor) Process(channel int, d delivery.Delivery) error {
 	return nil
 }
 
-func (p *processor) run(channel int) int {
+func (p *processor) run(cmd *exec.Cmd, channel int) int {
 	p.log.Infof("[Channel %d] Processing message...", channel)
 	defer p.log.Infof("[Channel %d] Processed!", channel)
 
 	var out []byte
 	var err error
-	capture := p.cmd.Stdout == nil && p.cmd.Stderr == nil
+	capture := cmd.Stdout == nil && cmd.Stderr == nil
 
 	if capture {
-		out, err = p.cmd.CombinedOutput()
+		out, err = cmd.CombinedOutput()
 	} else {
-		err = p.cmd.Run()
+		err = cmd.Run()
 	}
 
 	if err != nil {
