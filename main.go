@@ -11,16 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/corvus-ch/rabbitmq-cli-consumer/worker"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/exec"
-	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/fastcgi"
-
 	"github.com/bketelsen/logr"
 	"github.com/codegangsta/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/config"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/consumer"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/log"
+	"github.com/corvus-ch/rabbitmq-cli-consumer/worker/factory"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -94,6 +91,14 @@ var flags []cli.Flag = []cli.Flag{
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
 	},
+	cli.StringFlag{
+		Name:  "worker, w",
+		Usage: "Worker used to process messages, can be 'executable' or 'fast-cgi', 'executable' by default.",
+	},
+	cli.StringFlag{
+		Name:  "uri",
+		Usage: "uri used for the fast-cgi worker.",
+	},
 }
 
 var ll logr.Logger
@@ -132,16 +137,10 @@ func Action(c *cli.Context) error {
 	}
 	ll = l
 
-	var p worker.Process
-	e := c.String("executable")
-	// TODO Review condition leading to the usage of the FastCGI worker.
-	if strings.HasPrefix(e, "fcgi://") {
-		if p, err = fastcgi.New(cfg, l); err != nil {
-			return err
-		}
-	} else {
-		// TODO Make reject/requeue conditions configurable.
-		p = exec.New(e, []int{}, c.Bool("output"), ll)
+	p, err := factory.NewProcess(cfg, ll)
+
+	if err != nil {
+		return err
 	}
 
 	client, err := consumer.NewFromConfig(cfg, p, l)
@@ -266,8 +265,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 	file := c.String("configuration")
 	url := c.String("url")
 	queue := c.String("queue-name")
+	worker := c.String("worker")
+	uri := c.String("uri")
 
-	if file == "" && url == "" && queue == "" && c.String("executable") == "" {
+	if file == "" && url == "" && queue == "" {
 		cli.ShowAppHelp(c)
 		return nil, cli.NewExitError("", 1)
 	}
@@ -299,6 +300,26 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 
 	if c.IsSet("no-declare") {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
+	}
+
+	if c.IsSet("output") {
+		cfg.Consumer.Output = c.Bool("output")
+	}
+
+	if worker != "" {
+		cfg.Consumer.Worker = worker
+	}
+
+	if cfg.Consumer.Worker == "" {
+		cfg.Consumer.Worker = factory.Executable
+	}
+
+	if uri != "" {
+		cfg.Fastcgi.Uri = uri
+	}
+
+	if c.IsSet("include") {
+		cfg.Consumer.Include = c.Bool("include")
 	}
 
 	return cfg, nil
