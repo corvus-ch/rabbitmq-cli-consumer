@@ -10,6 +10,21 @@ import (
 )
 
 type Config struct {
+	Consumer struct {
+		Worker     string
+		Include    bool
+		Output     bool
+	}
+	Exec struct {
+		Executable string
+	}
+	Fastcgi struct {
+		Network string
+		Address string
+		Script  string
+		Method  string
+		Uri     string
+	}
 	RabbitMq struct {
 		AmqpUrl      string
 		Host         string
@@ -79,6 +94,50 @@ func (c *Config) AmqpUrl() string {
 	c.RabbitMq.AmqpUrl = uri.String()
 
 	return c.RabbitMq.AmqpUrl
+}
+
+// Worker returns the worker used to consume messages, can be "executable" or "fast-cgi"
+func (c Config) Worker() string {
+	return c.Consumer.Worker
+}
+
+// Include returns if the consumer must include metadata to the fast-cgi payload
+func (c Config) Include() bool {
+	return c.Consumer.Include
+}
+
+func (c Config) Output() bool {
+	return c.Consumer.Output
+}
+
+// Executable returns the command used by executable worker
+func (c Config) Executable() string {
+	return c.Exec.Executable
+}
+
+// Network returns the network used for fast-cgi
+func (c Config) Network() string {
+	return c.Fastcgi.Network
+}
+
+// Address returns the address used for fast-cgi
+func (c Config) Address() string {
+	return c.Fastcgi.Address
+}
+
+// Script returns the script used for fast-cgi
+func (c Config) Script() string {
+	return c.Fastcgi.Script
+}
+
+// Method returns the method used to call fast-cgi
+func (c Config) Method() string {
+	return c.Fastcgi.Method
+}
+
+// Uri returns the uri used for fast-cgi
+func (c Config) Uri () string {
+	return c.Fastcgi.Uri
 }
 
 // QueueName returns the name of toe queue to bind with.
