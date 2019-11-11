@@ -4,6 +4,8 @@
 [![Maintainability](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/maintainability)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/maintainability)
 [![Test Coverage](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/test_coverage)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/test_coverage)
 
+IMPORTANT: Looking for maintainer: https://github.com/corvus-ch/rabbitmq-cli-consumer/issues/81.
+
 If you are a fellow PHP developer just like me you're probably aware of the
 following fact: [PHP is meant to die][die].
 
