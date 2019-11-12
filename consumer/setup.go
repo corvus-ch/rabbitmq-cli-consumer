@@ -8,10 +8,6 @@ import (
 
 // Setup configures queues, exchanges and bindings in between according to the configuration.
 func Setup(cfg Config, ch Channel, l logr.Logger) error {
-	if err := setupQoS(cfg, ch, l); err != nil {
-		return err
-	}
-
 	if cfg.MustDeclareQueue() {
 		if err := declareQueue(cfg, ch, l); err != nil {
 			return err
@@ -25,15 +21,6 @@ func Setup(cfg Config, ch Channel, l logr.Logger) error {
 		}
 	}
 
-	return nil
-}
-
-func setupQoS(cfg Config, ch Channel, l logr.Logger) error {
-	l.Info("Setting QoS... ")
-	if err := ch.Qos(cfg.PrefetchCount(), 0, cfg.PrefetchIsGlobal()); err != nil {
-		return fmt.Errorf("failed to set QoS: %v", err)
-	}
-	l.Info("Succeeded setting QoS.")
 	return nil
 }
 

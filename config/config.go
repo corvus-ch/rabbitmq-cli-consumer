@@ -21,6 +21,7 @@ type Config struct {
 		Compression  bool
 		Onfailure    int
 		Stricfailure bool
+		NumChannels  int
 	}
 	Prefetch struct {
 		Count  int
@@ -217,6 +218,11 @@ func (c Config) QueueIsNoWait() bool {
 	return c.QueueSettings.NoWait
 }
 
+// NumChannels determines how many Channels to open on this Connection
+func (c Config) NumChannels() int {
+	return c.RabbitMq.NumChannels
+}
+
 // ConsumerTag returns the tag used to identify the consumer.
 func (c Config) ConsumerTag() string {
 	if v, set := os.LookupEnv("GO_WANT_HELPER_PROCESS"); set && v == "1" {
@@ -245,6 +251,7 @@ func LoadAndParse(location string) (*Config, error) {
 	cfg := &Config{}
 
 	SetDefaultQueueDurability(cfg)
+	SetDefaultNumChannels(cfg)
 
 	if err := gcfg.ReadFileInto(cfg, location); err != nil {
 		return nil, err
@@ -257,6 +264,7 @@ func CreateFromString(data string) (*Config, error) {
 	cfg := &Config{}
 
 	SetDefaultQueueDurability(cfg)
+	SetDefaultNumChannels(cfg)
 
 	if err := gcfg.ReadStringInto(cfg, data); err != nil {
 		return nil, err
@@ -268,6 +276,11 @@ func CreateFromString(data string) (*Config, error) {
 // SetDefaultQueueDurability sets queue durable to true to keep backwards compatibility
 func SetDefaultQueueDurability(cfg *Config) {
 	cfg.QueueSettings.Durable = true
+}
+
+// SetDefaultNumChannels sets NumChannels to 1 to keep backwards compatibility
+func SetDefaultNumChannels(cfg *Config) {
+	cfg.RabbitMq.NumChannels = 1
 }
 
 func transformToStringValue(val string) string {

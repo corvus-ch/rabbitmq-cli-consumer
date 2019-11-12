@@ -17,7 +17,7 @@ import (
 
 // Processor describes the interface used by the consumer to process messages.
 type Processor interface {
-	Process(delivery.Delivery) error
+	Process(int, delivery.Delivery) error
 }
 
 // New creates a new processor instance.
@@ -31,20 +31,16 @@ type processor struct {
 	ack     acknowledger.Acknowledger
 	log     logr.Logger
 	mu      sync.Mutex
-	cmd     *exec.Cmd
 }
 
 // Process creates a new exec command using the builder and executes the command. The message gets acknowledged
 // according to the commands exit code using the acknowledger.
-func (p *processor) Process(d delivery.Delivery) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+func (p *processor) Process(channel int, d delivery.Delivery) error {
 	var err error
 
-	p.cmd, err = p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
+	cmd, err := p.builder.GetCommand(d.Properties(), d.Info(), d.Body())
 	defer func() {
-		p.cmd = nil
+		cmd = nil
 	}()
 	if err != nil {
 		d.Nack(true)
@@ -52,7 +48,7 @@ func (p *processor) Process(d delivery.Delivery) error {
 	}
 
 	start := time.Now()
-	exitCode := p.run()
+	exitCode := p.run(cmd, channel)
 
 	collector.ProcessCounter.With(prometheus.Labels{"exit_code": strconv.Itoa(exitCode)}).Inc()
 	collector.ProcessDuration.Observe(time.Since(start).Seconds())
@@ -67,25 +63,25 @@ func (p *processor) Process(d delivery.Delivery) error {
 	return nil
 }
 
-func (p *processor) run() int {
-	p.log.Info("Processing message...")
-	defer p.log.Info("Processed!")
+func (p *processor) run(cmd *exec.Cmd, channel int) int {
+	p.log.Infof("[Channel %d] Processing message...", channel)
+	defer p.log.Infof("[Channel %d] Processed!", channel)
 
 	var out []byte
 	var err error
-	capture := p.cmd.Stdout == nil && p.cmd.Stderr == nil
+	capture := cmd.Stdout == nil && cmd.Stderr == nil
 
 	if capture {
-		out, err = p.cmd.CombinedOutput()
+		out, err = cmd.CombinedOutput()
 	} else {
-		err = p.cmd.Run()
+		err = cmd.Run()
 	}
 
 	if err != nil {
-		p.log.Info("Failed. Check error log for details.")
-		p.log.Errorf("Error: %s\n", err)
+		p.log.Infof("[Channel %d] Failed. Check error log for details.", channel)
+		p.log.Errorf("[Channel %d] Error: %s\n", channel, err)
 		if capture {
-			p.log.Errorf("Failed: %s", string(out))
+			p.log.Errorf("[Channel %d] Failed: %s", channel, string(out))
 		}
 
 		return exitCode(err)
