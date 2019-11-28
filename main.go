@@ -93,6 +93,11 @@ var flags []cli.Flag = []cli.Flag{
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
 	},
+	cli.StringFlag{
+		Name:  "prefetch",
+		Usage: "Number of messages to prefetch from the queue.",
+		Value: "3",
+	},
 }
 
 var ll logr.Logger
@@ -276,41 +281,35 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 	file := c.String("configuration")
 	url := c.String("url")
 	queue := c.String("queue-name")
-
 	if file == "" && url == "" && queue == "" && c.String("executable") == "" {
 		cli.ShowAppHelp(c)
 		return nil, cli.NewExitError("", 1)
 	}
-
 	cfg, err := configuration(file)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing configuration: %s", err)
 	}
-
 	if len(url) > 0 {
 		cfg.RabbitMq.AmqpUrl = url
 	}
-
 	if queue != "" {
 		cfg.RabbitMq.Queue = queue
 	}
-
 	if c.IsSet("no-datetime") {
 		cfg.Logs.NoDateTime = c.Bool("no-datetime")
 	}
-
 	if c.IsSet("verbose") {
 		cfg.Logs.Verbose = c.Bool("verbose")
 	}
-
 	if c.IsSet("strict-exit-code") {
 		cfg.RabbitMq.Stricfailure = c.Bool("strict-exit-code")
 	}
-
 	if c.IsSet("no-declare") {
 		cfg.QueueSettings.Nodeclare = c.Bool("no-declare")
 	}
-
+	if c.IsSet("prefetch") {
+		cfg.Prefetch.Count = c.Int("prefetch")
+	}
 	return cfg, nil
 }
 
