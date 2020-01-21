@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/bketelsen/logr"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
