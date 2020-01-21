@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/urfave/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer"
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli"
 )
 
 var loadConfigurationTest = []struct {

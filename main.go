@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/bketelsen/logr"
-	"github.com/urfave/cli"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
@@ -24,6 +23,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/streadway/amqp"
+	"github.com/urfave/cli"
 )
 
 var (
