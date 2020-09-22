@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
 	"os"
@@ -21,6 +22,10 @@ type Config struct {
 		Compression  bool
 		Onfailure    int
 		Stricfailure bool
+		TLSCertFile  string
+		TLSKeyFile   string
+		TLSCaFile    string
+		TLSConfig    *tls.Config
 	}
 	Prefetch struct {
 		Count  int
@@ -62,8 +67,13 @@ func (c *Config) AmqpUrl() string {
 		host = fmt.Sprintf("%s:%s", host, c.RabbitMq.Port)
 	}
 
+	scheme := "amqp"
+	if c.RabbitMq.TLSCertFile != "" {
+		scheme = "amqps"
+	}
+
 	uri := url.URL{
-		Scheme: "amqp",
+		Scheme: scheme,
 		Host:   host,
 		Path:   c.RabbitMq.Vhost,
 	}
@@ -228,6 +238,11 @@ func (c Config) ConsumerTag() string {
 		host = "unknown"
 	}
 	return fmt.Sprintf("ctag-%s-%d@%s", os.Args[0], os.Getpid(), host)
+}
+
+// TLSConfig returns the TLSConfig
+func (c Config) TLSConfig() *tls.Config {
+	return c.RabbitMq.TLSConfig
 }
 
 // LoadAndParse creates a new instance of config by parsing the content of teh given file.

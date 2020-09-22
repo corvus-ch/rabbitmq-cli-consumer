@@ -1,8 +1,13 @@
 package consumer
 
+import (
+	"crypto/tls"
+)
+
 // Config defines the interface to present configurations to the consumer.
 type Config interface {
 	AmqpUrl() string
+	TLSConfig() *tls.Config
 	ConsumerTag() string
 	DeadLetterExchange() string
 	DeadLetterRoutingKey() string

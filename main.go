@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	stdlog "log"
 	"net/http"
 	"os"
@@ -92,6 +95,18 @@ var flags []cli.Flag = []cli.Flag{
 		Name:  "web.telemetry-path",
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
+	},
+	cli.StringFlag{
+		Name:  "tls-cert-file",
+		Usage: "A Cert file to use for client authentication.",
+	},
+	cli.StringFlag{
+		Name:  "tls-key-file",
+		Usage: "A Key file to use for client authentication.",
+	},
+	cli.StringFlag{
+		Name:  "tls-ca-file",
+		Usage: "A CA Cert file to use for client authentication.",
 	},
 }
 
@@ -277,6 +292,10 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 	url := c.String("url")
 	queue := c.String("queue-name")
 
+	tlsCertFile := c.String("tls-cert-file")
+	tlsKeyFile := c.String("tls-key-file")
+	tlsCaFile := c.String("tls-ca-file")
+
 	if file == "" && url == "" && queue == "" && c.String("executable") == "" {
 		cli.ShowAppHelp(c)
 		return nil, cli.NewExitError("", 1)
@@ -294,6 +313,20 @@ func LoadConfiguration(c *cli.Context) (*config.Config, error) {
 	if queue != "" {
 		cfg.RabbitMq.Queue = queue
 	}
+
+	if tlsCertFile != "" {
+		cfg.RabbitMq.TLSCertFile = tlsCertFile
+	}
+
+	if tlsKeyFile != "" {
+		cfg.RabbitMq.TLSKeyFile = tlsKeyFile
+	}
+
+	if tlsCaFile != "" {
+		cfg.RabbitMq.TLSCaFile = tlsCaFile
+	}
+
+	cfg.RabbitMq.TLSConfig = setTLSConfig(cfg.RabbitMq.TLSCertFile, cfg.RabbitMq.TLSKeyFile, cfg.RabbitMq.TLSCaFile)
 
 	if c.IsSet("no-datetime") {
 		cfg.Logs.NoDateTime = c.Bool("no-datetime")
@@ -320,4 +353,31 @@ func configuration(file string) (*config.Config, error) {
 	}
 
 	return config.LoadAndParse(file)
+}
+
+func setTLSConfig(certFile string, keyFile string, caFile string) *tls.Config {
+	tlsConfig := &tls.Config{}
+
+	if certFile != "" && keyFile != "" {
+		// Load client cert
+		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			cli.NewExitError(fmt.Sprintf("invalid cert/key file: %s", err), 1)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+		tlsConfig.BuildNameToCertificate()
+	}
+
+	if caFile != "" {
+		// Load CA cert
+		caCert, err := ioutil.ReadFile(caFile)
+		if err != nil {
+			cli.NewExitError(fmt.Sprintf("invalid ca file: %s", err), 1)
+		}
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+		tlsConfig.RootCAs = caCertPool
+		tlsConfig.BuildNameToCertificate()
+	}
+	return tlsConfig
 }
