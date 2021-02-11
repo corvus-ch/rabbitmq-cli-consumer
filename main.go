@@ -34,61 +34,61 @@ var (
 
 // flags is the list of global flags known to the application.
 var flags []cli.Flag = []cli.Flag{
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:   "url, u",
 		Usage:  "Connect with RabbitMQ using `URL`",
 		EnvVar: "AMQP_URL",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "executable, e",
 		Usage: "Location of executable",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "configuration, c",
 		Usage: "Location of configuration file",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "output, o",
 		Usage: "Enable logging of output from executable",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "verbose, V",
 		Usage: "Enable verbose mode (logs to stdout and stderr)",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "pipe, p",
 		Usage: "Pipe the message via STDIN instead of passing it as an argument. The message metadata will be passed as JSON via fd3.",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "include, i",
 		Usage: "Include metadata. Passes message as JSON data including headers, properties and message body. This flag will be ignored when `-pipe` is used.",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "strict-exit-code",
 		Usage: "Strict exit code processing will rise a fatal error if exit code is different from allowed onces.",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "queue-name, q",
 		Usage: "Optional queue name to which can be passed in, without needing to define it in config, if set will override config queue name",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "no-datetime",
 		Usage: "prevents the output of date and time in the logs.",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "no-declare",
 		Usage: "prevents the queue from being declared.",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "metrics, m",
 		Usage: "enables metric to be exposed.",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "web.listen-address",
 		Usage: "Address on which to expose metrics and web interface.",
 		Value: ":9566",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "web.telemetry-path",
 		Usage: "Path under which to expose metrics.",
 		Value: "/metrics",
