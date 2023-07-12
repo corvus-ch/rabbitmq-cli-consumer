@@ -3,6 +3,8 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/bketelsen/logr"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/processor"
@@ -10,13 +12,15 @@ import (
 )
 
 type Consumer struct {
-	Connection Connection
-	Channel    Channel
-	Queue      string
-	Tag        string
-	Processor  processor.Processor
-	Log        logr.Logger
-	canceled   bool
+	Connection     Connection
+	Channel        Channel
+	Queue          string
+	Tag            string
+	Processor      processor.Processor
+	Log            logr.Logger
+	canceled       bool
+	prefetchCount  int
+	prefetchGlobal bool
 }
 
 // New creates a new consumer instance. The setup of the amqp connection and channel is expected to be done by the
@@ -52,13 +56,29 @@ func NewFromConfig(cfg Config, p processor.Processor, l logr.Logger) (*Consumer,
 	}
 
 	return &Consumer{
-		Connection: conn,
-		Channel:    ch,
-		Queue:      cfg.QueueName(),
-		Tag:        cfg.ConsumerTag(),
-		Processor:  p,
-		Log:        l,
+		Connection:     conn,
+		Channel:        ch,
+		Queue:          cfg.QueueName(),
+		Tag:            cfg.ConsumerTag(),
+		Processor:      p,
+		Log:            l,
+		prefetchCount:  cfg.PrefetchCount(),
+		prefetchGlobal: cfg.PrefetchIsGlobal(),
 	}, nil
+}
+
+func (c *Consumer) monitorConnection(ctx context.Context, errChan chan *amqp.Error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Second):
+			err := c.Channel.Qos(c.prefetchCount, 0, c.prefetchGlobal)
+			if err != nil {
+				errChan <- amqp.ErrClosed
+			}
+		}
+	}
 }
 
 // Consume subscribes itself to the message queue and starts consuming messages.
@@ -77,6 +97,7 @@ func (c *Consumer) Consume(ctx context.Context) error {
 
 	done := make(chan error)
 	go c.consume(msgs, done)
+	go c.monitorConnection(ctx, remoteClose)
 
 	select {
 	case err := <-remoteClose:
