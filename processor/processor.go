@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"context"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -8,12 +10,16 @@ import (
 	"time"
 
 	"github.com/bketelsen/logr"
+	"github.com/corvus-ch/logr/writer_adapter"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/acknowledger"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/collector"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/command"
 	"github.com/corvus-ch/rabbitmq-cli-consumer/delivery"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+const timeLogThreshold = 5 * time.Minute
+const timelogTicker = 30 * time.Second
 
 // Processor describes the interface used by the consumer to process messages.
 type Processor interface {
@@ -68,25 +74,51 @@ func (p *processor) Process(d delivery.Delivery) error {
 }
 
 func (p *processor) run() int {
+	start := time.Now()
 	p.log.Info("Processing message...")
-	defer p.log.Info("Processed!")
 
-	var out []byte
+	defer func() {
+		p.log.Info(fmt.Sprintf("Processed (%s)!", time.Since(start)))
+	}()
+
 	var err error
 	capture := p.cmd.Stdout == nil && p.cmd.Stderr == nil
 
+	tickerCtx, tickerCtxCancelFunc := context.WithCancel(context.Background())
+
+	go func() {
+		ticker := time.NewTicker(timelogTicker)
+
+		for {
+			select {
+			case <-ticker.C:
+				durationSinceStart := time.Since(start)
+
+				if durationSinceStart > timeLogThreshold {
+					p.log.Info(
+						fmt.Sprintf("Command still running after %s", durationSinceStart),
+					)
+				}
+			case <-tickerCtx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
 	if capture {
-		out, err = p.cmd.CombinedOutput()
-	} else {
-		err = p.cmd.Run()
+		logWriter := writer_adapter.NewInfoWriter(p.log)
+
+		p.cmd.Stdout = logWriter
+		p.cmd.Stderr = logWriter
 	}
 
+	err = p.cmd.Run()
+
+	tickerCtxCancelFunc()
+
 	if err != nil {
-		p.log.Info("Failed. Check error log for details.")
 		p.log.Errorf("Error: %s\n", err)
-		if capture {
-			p.log.Errorf("Failed: %s", string(out))
-		}
 
 		return exitCode(err)
 	}

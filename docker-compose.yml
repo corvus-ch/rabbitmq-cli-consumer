@@ -1,7 +1,24 @@
-version: '2'
+version: "3.9"
+
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:3.10.8-management-alpine
+    hostname: cli-consumer
     ports:
-      - "15672:15672"
       - "5672:5672"
+      - "15672:15672"
+
+  proxy:
+    image: cloudamqp/amqproxy:v0.8.11
+    environment:
+      AMQP_URL: amqp://connection:5676
+    ports:
+      - "5673:5673"
+
+  connection:
+    image: alpine/socat
+    command: tcp-listen:5676,reuseaddr,fork tcp:rabbitmq:5672
+
+
+volumes:
+  rabbitmq-data: ~
