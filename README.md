@@ -1,10 +1,10 @@
 # RabbitMQ cli consumer
 
-[![Build Status](https://travis-ci.org/corvus-ch/rabbitmq-cli-consumer.svg?branch=master)](https://travis-ci.org/corvus-ch/rabbitmq-cli-consumer)
-[![Maintainability](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/maintainability)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/392b42c2fe09633dfd30/test_coverage)](https://codeclimate.com/github/corvus-ch/rabbitmq-cli-consumer/test_coverage)
+IMPORTANT: This project is abandoned. If this project is of any use to you, and
+you are able and willing to drive it further, feel free to make a fork of it.
+If that will happen, let me know, an I will point out to your fork.
 
-IMPORTANT: Looking for maintainer: https://github.com/corvus-ch/rabbitmq-cli-consumer/issues/81.
+---
 
 If you are a fellow PHP developer just like me you're probably aware of the
 following fact: [PHP is meant to die][die].
